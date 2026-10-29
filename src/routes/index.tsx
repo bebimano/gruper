@@ -5,6 +5,7 @@ import { usernameToEmail } from "@/lib/username";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AboutLink } from "@/components/AboutLink";
 import logo from "@/assets/gruper-logo.png";
 
 export const Route = createFileRoute("/")({
@@ -47,8 +48,8 @@ function Login() {
   return (
     <main className="min-h-screen bg-hero flex flex-col items-center justify-center px-6 safe-top safe-bottom">
       <img src={logo} alt="Gruper — Shaping the Future of Water" width={904} height={269} className="w-64 h-auto mb-12" />
-      <form onSubmit={onSubmit} className="w-full max-w-sm space-y-5 rounded-2xl bg-card/70 backdrop-blur p-6 border border-border">
-        <h1 className="text-xl font-semibold">Acceso clientes</h1>
+      <form onSubmit={onSubmit} className="w-full max-w-sm space-y-5 rounded-3xl bg-card p-6 border border-border shadow-sm">
+        <h1 className="text-xl font-bold">Acceso clientes</h1>
         <div className="space-y-2">
           <Label htmlFor="u">Usuario</Label>
           <Input id="u" autoCapitalize="none" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} required className="h-12" />
@@ -65,6 +66,7 @@ function Login() {
       {needsSetup && (
         <Link to="/setup" className="mt-6 text-sm text-primary underline">Configuración inicial: crear administrador</Link>
       )}
+      <footer className="mt-10"><AboutLink /></footer>
     </main>
   );
 }

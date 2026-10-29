@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, RotateCw } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_authenticated/maquina/$id")({
   head: () => ({
@@ -31,10 +30,10 @@ function Viewer() {
 
   return (
     <div className="fixed inset-0 flex flex-col bg-background">
-      <header className="flex items-center gap-2 px-2 pb-2 safe-top border-b border-border bg-card">
-        <Button variant="ghost" size="icon" asChild aria-label="Volver"><Link to="/maquinas"><ArrowLeft /></Link></Button>
-        <span className="flex-1 truncate font-medium">{q.data?.name ?? ""}</span>
-        <Button variant="ghost" size="icon" onClick={() => setKey((k) => k + 1)} aria-label="Recargar"><RotateCw /></Button>
+      <header className="flex items-center gap-2 px-3 pb-1 safe-top">
+        <Link to="/maquinas" aria-label="Volver" className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-sm text-muted-foreground hover:text-primary"><ArrowLeft className="h-4 w-4" /></Link>
+        <span className="flex-1 truncate text-center text-sm font-semibold">{q.data?.name ?? ""}</span>
+        <button onClick={() => setKey((k) => k + 1)} aria-label="Recargar" className="rounded-full p-1.5 text-muted-foreground hover:text-primary"><RotateCw className="h-4 w-4" /></button>
       </header>
       {q.isLoading ? (
         <p className="m-auto text-muted-foreground">Conectando…</p>
