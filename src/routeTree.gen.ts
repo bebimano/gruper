@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as SetupRouteImport } from './routes/setup'
+import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedMaquinasRouteImport } from './routes/_authenticated/maquinas'
 import { Route as AuthenticatedMaquinaIdRouteImport } from './routes/_authenticated/maquina.$id'
 
@@ -29,6 +30,11 @@ const SetupRoute = SetupRouteImport.update({
   path: '/setup',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedMaquinasRoute = AuthenticatedMaquinasRouteImport.update({
   id: '/maquinas',
   path: '/maquinas',
@@ -43,12 +49,14 @@ const AuthenticatedMaquinaIdRoute = AuthenticatedMaquinaIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/setup': typeof SetupRoute
+  '/admin': typeof AuthenticatedAdminRoute
   '/maquinas': typeof AuthenticatedMaquinasRoute
   '/maquina/$id': typeof AuthenticatedMaquinaIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/setup': typeof SetupRoute
+  '/admin': typeof AuthenticatedAdminRoute
   '/maquinas': typeof AuthenticatedMaquinasRoute
   '/maquina/$id': typeof AuthenticatedMaquinaIdRoute
 }
@@ -57,19 +65,21 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/setup': typeof SetupRoute
+  '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/maquinas': typeof AuthenticatedMaquinasRoute
   '/_authenticated/maquina/$id': typeof AuthenticatedMaquinaIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/setup' | '/maquinas' | '/maquina/$id'
+  fullPaths: '/' | '/setup' | '/admin' | '/maquinas' | '/maquina/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/setup' | '/maquinas' | '/maquina/$id'
+  to: '/' | '/setup' | '/admin' | '/maquinas' | '/maquina/$id'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/setup'
+    | '/_authenticated/admin'
     | '/_authenticated/maquinas'
     | '/_authenticated/maquina/$id'
   fileRoutesById: FileRoutesById
@@ -103,6 +113,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SetupRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/maquinas': {
       id: '/_authenticated/maquinas'
       path: '/maquinas'
@@ -121,11 +138,13 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedMaquinasRoute: typeof AuthenticatedMaquinasRoute
   AuthenticatedMaquinaIdRoute: typeof AuthenticatedMaquinaIdRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedMaquinasRoute: AuthenticatedMaquinasRoute,
   AuthenticatedMaquinaIdRoute: AuthenticatedMaquinaIdRoute,
 }
