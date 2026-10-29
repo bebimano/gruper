@@ -32,9 +32,9 @@ function Admin() {
   if (!me.data?.isAdmin) return <p className="p-8 text-center text-muted-foreground">No autorizado</p>;
   return (
     <main className="min-h-screen bg-hero px-5 safe-top safe-bottom max-w-2xl mx-auto">
-      <header className="flex items-center gap-2 py-3">
-        <Button variant="ghost" size="icon" asChild aria-label="Volver"><Link to="/maquinas"><ArrowLeft /></Link></Button>
-        <h1 className="text-xl font-semibold">Administración</h1>
+      <header className="py-3">
+        <Link to="/maquinas" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-primary"><ArrowLeft className="h-4 w-4" /> Máquinas</Link>
+        <h1 className="mt-2 text-2xl font-bold">Administración</h1>
       </header>
       <Tabs defaultValue="machines" className="mt-2">
         <TabsList className="w-full">
