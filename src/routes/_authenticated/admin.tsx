@@ -68,9 +68,9 @@ function MachinesAdmin() {
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
-    if (!/^https:\/\//i.test(url.trim())) return toast.error("El enlace debe empezar por https://");
+    if (!/^https:\/\//i.test(url.trim())) { toast.error("El enlace debe empezar por https://"); return; }
     const { error } = await supabase.from("machines").insert({ name: name.trim(), description: description.trim() || null, url: url.trim() });
-    if (error) return err(error);
+    if (error) { err(error); return; }
     setName(""); setDescription(""); setUrl("");
     toast.success("Máquina añadida");
     qc.invalidateQueries();
@@ -78,7 +78,7 @@ function MachinesAdmin() {
   async function remove(id: string) {
     if (!confirm("¿Eliminar esta máquina?")) return;
     const { error } = await supabase.from("machines").delete().eq("id", id);
-    if (error) return err(error);
+    if (error) { err(error); return; }
     qc.invalidateQueries();
   }
 
@@ -140,7 +140,7 @@ function ClientsAdmin({ myId }: { myId: string }) {
     const { error } = on
       ? await supabase.from("machine_access").insert({ user_id: userId, machine_id: machineId })
       : await supabase.from("machine_access").delete().eq("user_id", userId).eq("machine_id", machineId);
-    if (error) return err(error);
+    if (error) { err(error); return; }
     qc.invalidateQueries({ queryKey: ["admin-clients"] });
   }
   async function remove(id: string, name: string) {

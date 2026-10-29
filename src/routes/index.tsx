@@ -40,7 +40,7 @@ function Login() {
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email: usernameToEmail(username), password });
     setLoading(false);
-    if (error) return setError("Usuario o contraseña incorrectos");
+    if (error) { setError("Usuario o contraseña incorrectos"); return; }
     navigate({ to: "/maquinas" });
   }
 
