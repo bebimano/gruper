@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AboutLink } from "@/components/AboutLink";
-import logo from "@/assets/gruper-logo.png";
+import logo from "@/assets/gruper-logo.png.asset.json";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -47,19 +47,22 @@ function Login() {
 
   return (
     <main className="min-h-screen bg-hero flex flex-col items-center justify-center px-6 safe-top safe-bottom">
-      <img src={logo} alt="Gruper — Shaping the Future of Water" width={904} height={269} className="w-64 h-auto mb-12" />
-      <form onSubmit={onSubmit} className="w-full max-w-sm space-y-5 rounded-3xl bg-card p-6 border border-border shadow-sm">
-        <h1 className="text-xl font-bold">Acceso clientes</h1>
+      <img src={logo.url} alt="Gruper — Shaping the Future of Water" width={1076} height={343} className="w-72 h-auto mb-10" />
+      <form onSubmit={onSubmit} className="w-full max-w-sm space-y-5 rounded-3xl bg-card p-7 border border-border shadow-sm">
+        <div className="space-y-1">
+          <h1 className="text-xl font-bold">Acceso clientes</h1>
+          <p className="text-sm text-muted-foreground">Entra con tu usuario y contraseña</p>
+        </div>
         <div className="space-y-2">
           <Label htmlFor="u">Usuario</Label>
-          <Input id="u" autoCapitalize="none" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} required className="h-12" />
+          <Input id="u" autoCapitalize="none" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} required className="h-12 rounded-xl" />
         </div>
         <div className="space-y-2">
           <Label htmlFor="p">Contraseña</Label>
-          <Input id="p" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required className="h-12" />
+          <Input id="p" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required className="h-12 rounded-xl" />
         </div>
         {error && <p className="text-sm text-destructive">{error}</p>}
-        <Button type="submit" disabled={loading} className="w-full h-12 text-base shadow-glow">
+        <Button type="submit" disabled={loading} className="w-full h-12 rounded-xl text-base font-semibold shadow-glow">
           {loading ? "Entrando…" : "Entrar"}
         </Button>
       </form>
