@@ -7,6 +7,7 @@ import { usernameToEmail } from "@/lib/username";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import logo from "@/assets/gruper-logo.png.asset.json";
 
 export const Route = createFileRoute("/setup")({
   head: () => ({
@@ -44,8 +45,9 @@ function Setup() {
   }
 
   return (
-    <main className="min-h-screen bg-hero flex items-center justify-center px-6">
-      <form onSubmit={onSubmit} className="w-full max-w-sm space-y-5 rounded-3xl bg-card p-6 shadow-sm border border-border">
+    <main className="min-h-screen bg-hero flex flex-col items-center justify-center px-6 safe-top safe-bottom">
+      <img src={logo.url} alt="Gruper — Shaping the Future of Water" width={1076} height={343} className="w-64 h-auto mb-10" />
+      <form onSubmit={onSubmit} className="w-full max-w-sm space-y-5 rounded-3xl bg-card p-7 shadow-sm border border-border">
         <h1 className="text-xl font-semibold">Crear administrador</h1>
         <p className="text-sm text-muted-foreground">Solo se puede hacer una vez. Esta será tu cuenta para gestionar clientes y máquinas.</p>
         <div className="space-y-2">
