@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMe } from "@/lib/useRole";
 import { Button } from "@/components/ui/button";
 import { AboutLink } from "@/components/AboutLink";
-import logo from "@/assets/gruper-logo.png";
+import logo from "@/assets/gruper-logo.png.asset.json";
 
 export const Route = createFileRoute("/_authenticated/maquinas")({
   head: () => ({
@@ -41,7 +41,7 @@ function Machines() {
   return (
     <main className="min-h-screen bg-hero px-5 safe-top safe-bottom flex flex-col max-w-2xl mx-auto">
       <header className="flex items-center justify-between py-3">
-        <img src={logo} alt="Gruper" width={904} height={269} className="h-9 w-auto" />
+        <img src={logo.url} alt="Gruper" width={1076} height={343} className="h-10 w-auto" />
         <div className="flex gap-1">
           {me.data?.isAdmin && (
             <Button variant="ghost" size="icon" asChild aria-label="Administración">

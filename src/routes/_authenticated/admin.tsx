@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { createClientUser, deleteClientUser, resetClientPassword } from "@/lib/users.functions";
 import { useMe } from "@/lib/useRole";
+import logo from "@/assets/gruper-logo.png.asset.json";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -33,8 +34,11 @@ function Admin() {
   return (
     <main className="min-h-screen bg-hero px-5 safe-top safe-bottom max-w-2xl mx-auto">
       <header className="py-3">
-        <Link to="/maquinas" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-primary"><ArrowLeft className="h-4 w-4" /> Máquinas</Link>
-        <h1 className="mt-2 text-2xl font-bold">Administración</h1>
+        <div className="flex items-center justify-between">
+          <img src={logo.url} alt="Gruper" width={1076} height={343} className="h-8 w-auto" />
+          <Link to="/maquinas" className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-sm text-muted-foreground hover:text-primary"><ArrowLeft className="h-4 w-4" /> Máquinas</Link>
+        </div>
+        <h1 className="mt-4 text-2xl font-bold">Administración</h1>
       </header>
       <Tabs defaultValue="machines" className="mt-2">
         <TabsList className="w-full">
