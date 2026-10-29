@@ -10,33 +10,74 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as SetupRouteImport } from './routes/setup'
+import { Route as AuthenticatedMaquinasRouteImport } from './routes/_authenticated/maquinas'
+import { Route as AuthenticatedMaquinaIdRouteImport } from './routes/_authenticated/maquina.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SetupRoute = SetupRouteImport.update({
+  id: '/setup',
+  path: '/setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedMaquinasRoute = AuthenticatedMaquinasRouteImport.update({
+  id: '/maquinas',
+  path: '/maquinas',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedMaquinaIdRoute = AuthenticatedMaquinaIdRouteImport.update({
+  id: '/maquina/$id',
+  path: '/maquina/$id',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/setup': typeof SetupRoute
+  '/maquinas': typeof AuthenticatedMaquinasRoute
+  '/maquina/$id': typeof AuthenticatedMaquinaIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/setup': typeof SetupRoute
+  '/maquinas': typeof AuthenticatedMaquinasRoute
+  '/maquina/$id': typeof AuthenticatedMaquinaIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/setup': typeof SetupRoute
+  '/_authenticated/maquinas': typeof AuthenticatedMaquinasRoute
+  '/_authenticated/maquina/$id': typeof AuthenticatedMaquinaIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/setup' | '/maquinas' | '/maquina/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/setup' | '/maquinas' | '/maquina/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/setup'
+    | '/_authenticated/maquinas'
+    | '/_authenticated/maquina/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  SetupRoute: typeof SetupRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +89,54 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/setup': {
+      id: '/setup'
+      path: '/setup'
+      fullPath: '/setup'
+      preLoaderRoute: typeof SetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/maquinas': {
+      id: '/_authenticated/maquinas'
+      path: '/maquinas'
+      fullPath: '/maquinas'
+      preLoaderRoute: typeof AuthenticatedMaquinasRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/maquina/$id': {
+      id: '/_authenticated/maquina/$id'
+      path: '/maquina/$id'
+      fullPath: '/maquina/$id'
+      preLoaderRoute: typeof AuthenticatedMaquinaIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedMaquinasRoute: typeof AuthenticatedMaquinasRoute
+  AuthenticatedMaquinaIdRoute: typeof AuthenticatedMaquinaIdRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedMaquinasRoute: AuthenticatedMaquinasRoute,
+  AuthenticatedMaquinaIdRoute: AuthenticatedMaquinaIdRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  SetupRoute: SetupRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
