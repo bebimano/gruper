@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AboutLink } from "@/components/AboutLink";
+import { ContactLink } from "@/components/ContactLink";
 import logo from "@/assets/gruper-logo.png.asset.json";
 
 export const Route = createFileRoute("/")({
@@ -15,6 +16,8 @@ export const Route = createFileRoute("/")({
       { name: "description", content: "Accede a tus máquinas Gruper de forma remota y segura." },
       { property: "og:title", content: "Gruper Remote — Acceso clientes" },
       { property: "og:description", content: "Accede a tus máquinas Gruper de forma remota y segura." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: Login,
@@ -69,7 +72,7 @@ function Login() {
       {needsSetup && (
         <Link to="/setup" className="mt-6 text-sm text-primary underline">Configuración inicial: crear administrador</Link>
       )}
-      <footer className="mt-10"><AboutLink /></footer>
+      <footer className="mt-10 flex w-full flex-col items-center gap-3"><AboutLink /><ContactLink /></footer>
     </main>
   );
 }
