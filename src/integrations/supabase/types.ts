@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      contact_submissions: {
+        Row: {
+          company: string
+          created_at: string
+          id: string
+          message: string
+          name: string
+          phone: string
+        }
+        Insert: {
+          company: string
+          created_at?: string
+          id?: string
+          message: string
+          name: string
+          phone: string
+        }
+        Update: {
+          company?: string
+          created_at?: string
+          id?: string
+          message?: string
+          name?: string
+          phone?: string
+        }
+        Relationships: []
+      }
       machine_access: {
         Row: {
           machine_id: string

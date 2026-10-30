@@ -11,6 +11,8 @@ export const Route = createFileRoute("/_authenticated/maquina/$id")({
       { name: "description", content: "Visualización remota de tu máquina Gruper." },
       { property: "og:title", content: "Pantalla remota — Gruper Remote" },
       { property: "og:description", content: "Visualización remota de tu máquina Gruper." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: Viewer,

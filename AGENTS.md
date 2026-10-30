@@ -13,3 +13,4 @@
 - Accounts are created only by the admin (public signup disabled); usernames map to a synthetic email via src/lib/username.ts — keeps login username-only.
 - Machine visibility is enforced by RLS (machines + machine_access); admin user management runs in server functions with the service-role client after a role check.
 - Native apps are a Capacitor shell loading the published URL — so new machines/clients never need a store update.
+- Contact intake uses shared schema validation and a dedicated public server function with server-only insert; only admins can read stored messages through RLS, preventing public exposure of contact details.

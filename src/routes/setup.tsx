@@ -16,6 +16,8 @@ export const Route = createFileRoute("/setup")({
       { name: "description", content: "Crea la cuenta de administrador de Gruper Remote." },
       { property: "og:title", content: "Configuración inicial — Gruper Remote" },
       { property: "og:description", content: "Crea la cuenta de administrador de Gruper Remote." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: Setup,

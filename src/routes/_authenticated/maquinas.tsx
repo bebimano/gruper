@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMe } from "@/lib/useRole";
 import { Button } from "@/components/ui/button";
 import { AboutLink } from "@/components/AboutLink";
+import { ContactLink } from "@/components/ContactLink";
 import logo from "@/assets/gruper-logo.png.asset.json";
 
 export const Route = createFileRoute("/_authenticated/maquinas")({
@@ -14,6 +15,8 @@ export const Route = createFileRoute("/_authenticated/maquinas")({
       { name: "description", content: "Elige la máquina a la que quieres acceder." },
       { property: "og:title", content: "Mis máquinas — Gruper Remote" },
       { property: "og:description", content: "Elige la máquina a la que quieres acceder." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: Machines,
@@ -70,7 +73,7 @@ function Machines() {
           </Link>
         ))}
       </div>
-      <footer className="flex justify-center py-8"><AboutLink /></footer>
+      <footer className="flex flex-col items-center gap-3 py-8"><AboutLink /><ContactLink /></footer>
     </main>
   );
 }

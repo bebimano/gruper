@@ -9,6 +9,8 @@ export const Route = createFileRoute("/sobre-nosotros")({
       { name: "description", content: "Conoce Gruper: Shaping the Future of Water." },
       { property: "og:title", content: "Sobre nosotros — Gruper Remote" },
       { property: "og:description", content: "Conoce Gruper: Shaping the Future of Water." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: About,

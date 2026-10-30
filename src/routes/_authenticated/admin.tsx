@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ContactMessages } from "@/components/ContactMessages";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({
@@ -20,6 +21,8 @@ export const Route = createFileRoute("/_authenticated/admin")({
       { name: "description", content: "Gestiona clientes y máquinas de Gruper Remote." },
       { property: "og:title", content: "Administración — Gruper Remote" },
       { property: "og:description", content: "Gestiona clientes y máquinas de Gruper Remote." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: Admin,
@@ -44,9 +47,11 @@ function Admin() {
         <TabsList className="w-full">
           <TabsTrigger value="machines" className="flex-1">Máquinas</TabsTrigger>
           <TabsTrigger value="clients" className="flex-1">Clientes</TabsTrigger>
+          <TabsTrigger value="messages" className="flex-1">Mensajes</TabsTrigger>
         </TabsList>
         <TabsContent value="machines"><MachinesAdmin /></TabsContent>
         <TabsContent value="clients"><ClientsAdmin myId={me.data.id} /></TabsContent>
+        <TabsContent value="messages"><ContactMessages /></TabsContent>
       </Tabs>
     </main>
   );
