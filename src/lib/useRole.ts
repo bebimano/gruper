@@ -9,12 +9,14 @@ export function useMe() {
       if (!u.user) return null;
       const [{ data: roles }, { data: profile }] = await Promise.all([
         supabase.from("user_roles").select("role").eq("user_id", u.user.id),
-        supabase.from("profiles").select("username").eq("id", u.user.id).maybeSingle(),
+        supabase.from("profiles").select("username, can_work_reports").eq("id", u.user.id).maybeSingle(),
       ]);
+      const isAdmin = !!roles?.some((r) => r.role === "admin");
       return {
         id: u.user.id,
         username: profile?.username ?? "",
-        isAdmin: !!roles?.some((r) => r.role === "admin"),
+        isAdmin,
+        canReports: isAdmin || !!profile?.can_work_reports,
       };
     },
   });
