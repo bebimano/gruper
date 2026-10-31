@@ -14,3 +14,4 @@
 - Machine visibility is enforced by RLS (machines + machine_access); admin user management runs in server functions with the service-role client after a role check.
 - Native apps are a Capacitor shell loading the published URL — so new machines/clients never need a store update.
 - Contact intake uses shared schema validation and a dedicated public server function with server-only insert; only admins can read stored messages through RLS, preventing public exposure of contact details.
+- Work reports (partes de trabajo) store the form as jsonb in work_reports; access gated by profiles.can_work_reports via the can_work_reports() RLS helper, toggled by admins — keeps form fields flexible without migrations.

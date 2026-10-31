@@ -90,16 +90,19 @@ export type Database = {
       }
       profiles: {
         Row: {
+          can_work_reports: boolean
           created_at: string
           id: string
           username: string
         }
         Insert: {
+          can_work_reports?: boolean
           created_at?: string
           id: string
           username: string
         }
         Update: {
+          can_work_reports?: boolean
           created_at?: string
           id?: string
           username?: string
@@ -124,12 +127,40 @@ export type Database = {
         }
         Relationships: []
       }
+      work_reports: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+          number: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data?: Json
+          id?: string
+          number?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+          number?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
       admin_exists: { Args: never; Returns: boolean }
+      can_work_reports: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

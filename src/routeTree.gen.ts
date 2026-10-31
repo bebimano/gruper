@@ -16,7 +16,9 @@ import { Route as SetupRouteImport } from './routes/setup'
 import { Route as SobreNosotrosRouteImport } from './routes/sobre-nosotros'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedMaquinasRouteImport } from './routes/_authenticated/maquinas'
+import { Route as AuthenticatedPartesRouteImport } from './routes/_authenticated/partes'
 import { Route as AuthenticatedMaquinaIdRouteImport } from './routes/_authenticated/maquina.$id'
+import { Route as AuthenticatedParteIdRouteImport } from './routes/_authenticated/parte.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -52,9 +54,19 @@ const AuthenticatedMaquinasRoute = AuthenticatedMaquinasRouteImport.update({
   path: '/maquinas',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedPartesRoute = AuthenticatedPartesRouteImport.update({
+  id: '/partes',
+  path: '/partes',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedMaquinaIdRoute = AuthenticatedMaquinaIdRouteImport.update({
   id: '/maquina/$id',
   path: '/maquina/$id',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedParteIdRoute = AuthenticatedParteIdRouteImport.update({
+  id: '/parte/$id',
+  path: '/parte/$id',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 
@@ -65,7 +77,9 @@ export interface FileRoutesByFullPath {
   '/sobre-nosotros': typeof SobreNosotrosRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/maquinas': typeof AuthenticatedMaquinasRoute
+  '/partes': typeof AuthenticatedPartesRoute
   '/maquina/$id': typeof AuthenticatedMaquinaIdRoute
+  '/parte/$id': typeof AuthenticatedParteIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -74,7 +88,9 @@ export interface FileRoutesByTo {
   '/sobre-nosotros': typeof SobreNosotrosRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/maquinas': typeof AuthenticatedMaquinasRoute
+  '/partes': typeof AuthenticatedPartesRoute
   '/maquina/$id': typeof AuthenticatedMaquinaIdRoute
+  '/parte/$id': typeof AuthenticatedParteIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -85,7 +101,9 @@ export interface FileRoutesById {
   '/sobre-nosotros': typeof SobreNosotrosRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/maquinas': typeof AuthenticatedMaquinasRoute
+  '/_authenticated/partes': typeof AuthenticatedPartesRoute
   '/_authenticated/maquina/$id': typeof AuthenticatedMaquinaIdRoute
+  '/_authenticated/parte/$id': typeof AuthenticatedParteIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -96,7 +114,9 @@ export interface FileRouteTypes {
     | '/sobre-nosotros'
     | '/admin'
     | '/maquinas'
+    | '/partes'
     | '/maquina/$id'
+    | '/parte/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -105,7 +125,9 @@ export interface FileRouteTypes {
     | '/sobre-nosotros'
     | '/admin'
     | '/maquinas'
+    | '/partes'
     | '/maquina/$id'
+    | '/parte/$id'
   id:
     | '__root__'
     | '/'
@@ -115,7 +137,9 @@ export interface FileRouteTypes {
     | '/sobre-nosotros'
     | '/_authenticated/admin'
     | '/_authenticated/maquinas'
+    | '/_authenticated/partes'
     | '/_authenticated/maquina/$id'
+    | '/_authenticated/parte/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -177,11 +201,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMaquinasRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/partes': {
+      id: '/_authenticated/partes'
+      path: '/partes'
+      fullPath: '/partes'
+      preLoaderRoute: typeof AuthenticatedPartesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/maquina/$id': {
       id: '/_authenticated/maquina/$id'
       path: '/maquina/$id'
       fullPath: '/maquina/$id'
       preLoaderRoute: typeof AuthenticatedMaquinaIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/parte/$id': {
+      id: '/_authenticated/parte/$id'
+      path: '/parte/$id'
+      fullPath: '/parte/$id'
+      preLoaderRoute: typeof AuthenticatedParteIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
   }
@@ -190,13 +228,17 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedMaquinasRoute: typeof AuthenticatedMaquinasRoute
+  AuthenticatedPartesRoute: typeof AuthenticatedPartesRoute
   AuthenticatedMaquinaIdRoute: typeof AuthenticatedMaquinaIdRoute
+  AuthenticatedParteIdRoute: typeof AuthenticatedParteIdRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedMaquinasRoute: AuthenticatedMaquinasRoute,
+  AuthenticatedPartesRoute: AuthenticatedPartesRoute,
   AuthenticatedMaquinaIdRoute: AuthenticatedMaquinaIdRoute,
+  AuthenticatedParteIdRoute: AuthenticatedParteIdRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =

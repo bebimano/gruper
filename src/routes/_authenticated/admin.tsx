@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { ArrowLeft, Trash2, KeyRound } from "lucide-react";
+import { ArrowLeft, Trash2, KeyRound, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { createClientUser, deleteClientUser, resetClientPassword } from "@/lib/users.functions";
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { ContactMessages } from "@/components/ContactMessages";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -48,10 +49,17 @@ function Admin() {
           <TabsTrigger value="machines" className="flex-1">Máquinas</TabsTrigger>
           <TabsTrigger value="clients" className="flex-1">Clientes</TabsTrigger>
           <TabsTrigger value="messages" className="flex-1">Mensajes</TabsTrigger>
+          <TabsTrigger value="reports" className="flex-1">Partes</TabsTrigger>
         </TabsList>
         <TabsContent value="machines"><MachinesAdmin /></TabsContent>
         <TabsContent value="clients"><ClientsAdmin myId={me.data.id} /></TabsContent>
         <TabsContent value="messages"><ContactMessages /></TabsContent>
+        <TabsContent value="reports">
+          <div className="mt-4 rounded-xl border border-border p-4 space-y-3">
+            <p className="text-sm text-muted-foreground">Activa "Partes de trabajo" en cada cliente desde la pestaña Clientes. Aquí ves todos los partes.</p>
+            <Button asChild variant="outline" className="w-full"><Link to="/partes"><FileText /> Ver todos los partes</Link></Button>
+          </div>
+        </TabsContent>
       </Tabs>
     </main>
   );
@@ -74,13 +82,29 @@ function MachinesAdmin() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [url, setUrl] = useState("");
+  const [assign, setAssign] = useState<Set<string>>(new Set());
+  const clientList = useQuery({
+    queryKey: ["admin-client-list"],
+    queryFn: async () => {
+      const [{ data: p }, { data: admins }] = await Promise.all([
+        supabase.from("profiles").select("id, username").order("username"),
+        supabase.from("user_roles").select("user_id").eq("role", "admin"),
+      ]);
+      const a = new Set((admins ?? []).map((x) => x.user_id));
+      return (p ?? []).filter((x) => !a.has(x.id));
+    },
+  });
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
     if (!/^https:\/\//i.test(url.trim())) { toast.error("El enlace debe empezar por https://"); return; }
-    const { error } = await supabase.from("machines").insert({ name: name.trim(), description: description.trim() || null, url: url.trim() });
+    const { data: m, error } = await supabase.from("machines").insert({ name: name.trim(), description: description.trim() || null, url: url.trim() }).select("id").single();
     if (error) { err(error); return; }
-    setName(""); setDescription(""); setUrl("");
+    if (assign.size) {
+      const { error: e2 } = await supabase.from("machine_access").insert([...assign].map((user_id) => ({ user_id, machine_id: m.id })));
+      if (e2) err(e2);
+    }
+    setName(""); setDescription(""); setUrl(""); setAssign(new Set());
     toast.success("Máquina añadida");
     qc.invalidateQueries();
   }
@@ -93,15 +117,32 @@ function MachinesAdmin() {
 
   return (
     <div className="space-y-4 mt-4">
-      <form onSubmit={add} className="space-y-3 rounded-2xl border border-border bg-card p-4">
+      <form onSubmit={add} className="space-y-3 rounded-xl border border-border bg-background p-4">
         <h2 className="font-medium">Nueva máquina</h2>
         <Input placeholder="Nombre (ej. Depuradora 1)" value={name} onChange={(e) => setName(e.target.value)} required maxLength={80} />
         <Input placeholder="Descripción (opcional)" value={description} onChange={(e) => setDescription(e.target.value)} maxLength={160} />
         <Input placeholder="https://… enlace noVNC" value={url} onChange={(e) => setUrl(e.target.value)} required autoCapitalize="none" />
-        <Button type="submit" className="w-full">Añadir</Button>
+        {!!clientList.data?.length && (
+          <div className="space-y-2 pt-1">
+            <p className="text-xs font-medium text-muted-foreground">Asignar a clientes</p>
+            <div className="flex flex-wrap gap-2">
+              {clientList.data.map((c) => {
+                const on = assign.has(c.id);
+                return (
+                  <button type="button" key={c.id} aria-pressed={on}
+                    onClick={() => { const n = new Set(assign); on ? n.delete(c.id) : n.add(c.id); setAssign(n); }}
+                    className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${on ? "border-primary bg-primary text-primary-foreground" : "border-input hover:bg-muted"}`}>
+                    {c.username}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        <Button type="submit" className="w-full">Añadir máquina</Button>
       </form>
       {machines.data?.map((m) => (
-        <div key={m.id} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4">
+        <div key={m.id} className="flex items-center gap-3 rounded-xl border border-border bg-background p-4">
           <div className="flex-1 min-w-0">
             <p className="font-medium">{m.name}</p>
             <p className="text-xs text-muted-foreground truncate">{m.url}</p>
@@ -126,7 +167,7 @@ function ClientsAdmin({ myId }: { myId: string }) {
     queryKey: ["admin-clients"],
     queryFn: async () => {
       const [{ data: profiles }, { data: access }] = await Promise.all([
-        supabase.from("profiles").select("id, username").order("username"),
+        supabase.from("profiles").select("id, username, can_work_reports").order("username"),
         supabase.from("machine_access").select("user_id, machine_id"),
       ]);
       return (profiles ?? []).filter((p) => p.id !== myId).map((p) => ({
@@ -152,6 +193,11 @@ function ClientsAdmin({ myId }: { myId: string }) {
     if (error) { err(error); return; }
     qc.invalidateQueries({ queryKey: ["admin-clients"] });
   }
+  async function toggleReports(id: string, on: boolean) {
+    const { error } = await supabase.from("profiles").update({ can_work_reports: on }).eq("id", id);
+    if (error) { err(error); return; }
+    qc.invalidateQueries({ queryKey: ["admin-clients"] });
+  }
   async function remove(id: string, name: string) {
     if (!confirm(`¿Eliminar al cliente ${name}?`)) return;
     try { await deleteFn({ data: { id } }); qc.invalidateQueries({ queryKey: ["admin-clients"] }); } catch (e) { err(e); }
@@ -164,19 +210,23 @@ function ClientsAdmin({ myId }: { myId: string }) {
 
   return (
     <div className="space-y-4 mt-4">
-      <form onSubmit={add} className="space-y-3 rounded-2xl border border-border bg-card p-4">
+      <form onSubmit={add} className="space-y-3 rounded-xl border border-border bg-background p-4">
         <h2 className="font-medium">Nuevo cliente</h2>
         <Input placeholder="Usuario" value={username} onChange={(e) => setUsername(e.target.value)} required autoCapitalize="none" />
         <Input placeholder="Contraseña" value={password} onChange={(e) => setPassword(e.target.value)} required />
         <Button type="submit" className="w-full">Crear cliente</Button>
       </form>
       {clients.data?.map((c) => (
-        <div key={c.id} className="rounded-2xl border border-border bg-card p-4 space-y-3">
+        <div key={c.id} className="rounded-xl border border-border bg-background p-4 space-y-3">
           <div className="flex items-center gap-2">
             <p className="flex-1 font-medium">{c.username}</p>
             <Button variant="ghost" size="icon" onClick={() => reset(c.id)} aria-label="Cambiar contraseña"><KeyRound /></Button>
             <Button variant="ghost" size="icon" onClick={() => remove(c.id, c.username)} aria-label="Eliminar"><Trash2 /></Button>
           </div>
+          <label className="flex items-center justify-between rounded-lg bg-muted/60 px-3 py-2 text-sm">
+            <span className="flex items-center gap-2"><FileText className="h-4 w-4 text-primary" /> Partes de trabajo</span>
+            <Switch checked={c.can_work_reports} onCheckedChange={(v) => toggleReports(c.id, v)} />
+          </label>
           <div className="space-y-2">
             {machines.data?.length === 0 && <p className="text-sm text-muted-foreground">Añade máquinas primero.</p>}
             {machines.data?.map((m) => (
