@@ -10,6 +10,7 @@ import { emptyDia, emptyLinea, emptyReport, normalizeReport, type Linea, type Wo
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { SignaturePad } from "@/components/SignaturePad";
 
 export const Route = createFileRoute("/_authenticated/parte/$id")({
   head: () => ({
@@ -69,19 +70,25 @@ function Parte() {
 
   if (!r) return <p className="p-8 text-center text-muted-foreground">{existing.isFetched && !existing.data ? "Parte no encontrado" : "Cargando…"}</p>;
 
+  const closed = !!existing.data?.closed;
   const set = <K extends keyof WorkReport>(k: K, v: WorkReport[K]) => setR({ ...r, [k]: v });
   const f = (k: keyof WorkReport) => ({ value: r[k] as string, onChange: (v: string) => set(k, v as never) });
 
-  async function save() {
+  async function save(close: boolean) {
+    if (close) {
+      if (!r!.firma) { toast.error("Falta la firma del cliente"); return; }
+      if (!confirm("Una vez cerrado, el parte no se podrá modificar ni borrar. ¿Cerrar?")) return;
+    }
     setSaving(true);
     const payload = r as unknown as Json;
     const res = isNew
-      ? await supabase.from("work_reports").insert({ data: payload }).select("id").single()
-      : await supabase.from("work_reports").update({ data: payload, updated_at: new Date().toISOString() }).eq("id", id).select("id").single();
+      ? await supabase.from("work_reports").insert({ data: payload, closed: close }).select("id").single()
+      : await supabase.from("work_reports").update({ data: payload, closed: close, updated_at: new Date().toISOString() }).eq("id", id).select("id").single();
     setSaving(false);
     if (res.error) { toast.error(res.error.message); return; }
-    toast.success("Parte guardado");
+    toast.success(close ? "Parte cerrado" : "Parte guardado");
     qc.invalidateQueries({ queryKey: ["work-reports"] });
+    qc.invalidateQueries({ queryKey: ["work-report", res.data.id] });
     if (isNew) navigate({ to: "/parte/$id", params: { id: res.data.id }, replace: true });
   }
   async function remove() {
@@ -115,14 +122,16 @@ function Parte() {
         <Link to="/partes" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Partes</Link>
         <div className="flex gap-1">
           <Button variant="ghost" size="icon" onClick={() => window.print()} aria-label="Imprimir o PDF"><Printer /></Button>
-          {!isNew && <Button variant="ghost" size="icon" onClick={remove} aria-label="Eliminar parte"><Trash2 /></Button>}
+          {!isNew && (!closed || me.data?.isAdmin) && <Button variant="ghost" size="icon" onClick={remove} aria-label="Eliminar parte"><Trash2 /></Button>}
         </div>
       </header>
       <div className="mt-2 mb-6">
         <p className="text-xs font-semibold uppercase tracking-wide text-primary">Servicio asistencia técnica</p>
         <h1 className="text-2xl font-bold">Parte de trabajo {existing.data ? `Nº ${existing.data.number}` : "nuevo"}</h1>
+        {closed && <p className="mt-1 text-sm text-muted-foreground">Cerrado — ya no se puede modificar ni borrar.</p>}
       </div>
 
+      <fieldset disabled={closed} className="min-w-0">
       <div className="space-y-4">
         <Section title="Datos generales">
           <div className="grid gap-3 sm:grid-cols-2">
@@ -177,10 +186,25 @@ function Parte() {
             <Textarea rows={3} value={r.observaciones} onChange={(e) => set("observaciones", e.target.value)} />
           </label>
         </Section>
+
+        <Section title="Firma del cliente">
+          <Field label="Nombre de quien firma" {...f("firmaNombre")} />
+          <SignaturePad value={r.firma} onChange={(v) => set("firma", v)} disabled={closed} />
+        </Section>
       </div>
+      </fieldset>
 
       <div className="fixed inset-x-0 bottom-0 border-t border-border bg-background/95 backdrop-blur px-5 py-3 safe-bottom print:hidden">
-        <div className="mx-auto max-w-3xl"><Button className="w-full" onClick={save} disabled={saving}>{saving ? "Guardando…" : "Guardar parte"}</Button></div>
+        <div className="mx-auto max-w-3xl">
+          {closed ? (
+            <p className="text-center text-sm font-medium text-muted-foreground">Parte cerrado y firmado</p>
+          ) : (
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => save(false)} disabled={saving}>{saving ? "Guardando…" : "Guardar"}</Button>
+              <Button className="flex-1" onClick={() => save(true)} disabled={saving}>Cerrar parte</Button>
+            </div>
+          )}
+        </div>
       </div>
     </main>
   );

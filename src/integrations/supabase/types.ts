@@ -129,6 +129,7 @@ export type Database = {
       }
       work_reports: {
         Row: {
+          closed: boolean
           created_at: string
           data: Json
           id: string
@@ -137,6 +138,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          closed?: boolean
           created_at?: string
           data?: Json
           id?: string
@@ -145,6 +147,7 @@ export type Database = {
           user_id?: string
         }
         Update: {
+          closed?: boolean
           created_at?: string
           data?: Json
           id?: string

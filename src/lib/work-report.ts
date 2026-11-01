@@ -11,6 +11,7 @@ export type WorkReport = {
   materiales: string; instalacion: string;
   dias: Dia[]; trabajos: Linea[]; materialesLista: Linea[];
   solicitadoPor: string; observaciones: string;
+  firmaNombre: string; firma: string;
 };
 
 export const emptyDia = (): Dia => ({ fecha: "", idaDe: "", idaA: "", kmIda: "", mananaDe: "", mananaA: "", tardeDe: "", tardeA: "", vueltaDe: "", vueltaA: "", kmVuelta: "" });
@@ -21,7 +22,7 @@ export function emptyReport(tecnico = ""): WorkReport {
     cliente: "", de: "", tecnico, vehiculo: "", codigoMaquina: "", numSerie: "",
     reparacion: "", suministro: "", materiales: "", instalacion: "",
     dias: [emptyDia()], trabajos: [emptyLinea()], materialesLista: [emptyLinea()],
-    solicitadoPor: "", observaciones: "",
+    solicitadoPor: "", observaciones: "", firmaNombre: "", firma: "",
   };
 }
 
