@@ -22,6 +22,13 @@
       "when": 1793461601108,
       "tag": "0002_work_reports",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793561817473,
+      "tag": "0003_work_reports_closed",
+      "breakpoints": true
     }
   ]
 }
