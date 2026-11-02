@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { SignaturePad } from "@/components/SignaturePad";
+import { MaterialPicker } from "@/components/MaterialPicker";
 
 export const Route = createFileRoute("/_authenticated/parte/$id")({
   head: () => ({
@@ -105,7 +106,9 @@ function Parte() {
         const upd = (p: Partial<Linea>) => set(key, r[key].map((x, j) => (j === i ? { ...x, ...p } : x)));
         return (
           <div key={i} className="grid grid-cols-[1fr_4.5rem_auto] gap-2 sm:grid-cols-[8rem_1fr_5rem_auto] items-start">
-            <Input placeholder={codeLabel} value={l.codigo} onChange={(e) => upd({ codigo: e.target.value })} className="col-span-3 sm:col-span-1" />
+            {key === "materialesLista"
+              ? <MaterialPicker value={l.codigo} placeholder={codeLabel} onChange={(v) => upd({ codigo: v })} onPick={(m) => upd({ codigo: m.codigo, descripcion: m.descripcion })} />
+              : <Input placeholder={codeLabel} value={l.codigo} onChange={(e) => upd({ codigo: e.target.value })} className="col-span-3 sm:col-span-1" />}
             <Textarea placeholder="Descripción" rows={2} value={l.descripcion} onChange={(e) => upd({ descripcion: e.target.value })} className="min-h-11" />
             <Input placeholder="Cant." value={l.cantidad} onChange={(e) => upd({ cantidad: e.target.value })} />
             <Button type="button" variant="ghost" size="icon" className="print:hidden" aria-label="Quitar línea" onClick={() => set(key, r[key].filter((_, j) => j !== i))}><X /></Button>

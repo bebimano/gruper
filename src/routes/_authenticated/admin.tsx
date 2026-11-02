@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { ContactMessages } from "@/components/ContactMessages";
+import { MaterialsAdmin } from "@/components/MaterialsAdmin";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({
@@ -50,6 +51,7 @@ function Admin() {
           <TabsTrigger value="clients" className="flex-1">Clientes</TabsTrigger>
           <TabsTrigger value="messages" className="flex-1">Mensajes</TabsTrigger>
           <TabsTrigger value="reports" className="flex-1">Partes</TabsTrigger>
+          <TabsTrigger value="stock" className="flex-1">Stock</TabsTrigger>
         </TabsList>
         <TabsContent value="machines"><MachinesAdmin /></TabsContent>
         <TabsContent value="clients"><ClientsAdmin myId={me.data.id} /></TabsContent>
@@ -60,6 +62,7 @@ function Admin() {
             <Button asChild variant="outline" className="w-full"><Link to="/partes"><FileText /> Ver todos los partes</Link></Button>
           </div>
         </TabsContent>
+        <TabsContent value="stock"><MaterialsAdmin /></TabsContent>
       </Tabs>
     </main>
   );
