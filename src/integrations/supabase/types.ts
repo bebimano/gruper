@@ -88,6 +88,54 @@ export type Database = {
         }
         Relationships: []
       }
+      material_source: {
+        Row: {
+          id: number
+          kind: string
+          name: string
+          synced_at: string
+          url: string | null
+        }
+        Insert: {
+          id?: number
+          kind?: string
+          name?: string
+          synced_at?: string
+          url?: string | null
+        }
+        Update: {
+          id?: number
+          kind?: string
+          name?: string
+          synced_at?: string
+          url?: string | null
+        }
+        Relationships: []
+      }
+      materials: {
+        Row: {
+          codigo: string
+          created_at: string
+          descripcion: string
+          id: string
+          stock: string
+        }
+        Insert: {
+          codigo?: string
+          created_at?: string
+          descripcion?: string
+          id?: string
+          stock?: string
+        }
+        Update: {
+          codigo?: string
+          created_at?: string
+          descripcion?: string
+          id?: string
+          stock?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           can_work_reports: boolean
