@@ -29,6 +29,13 @@
       "when": 1793561817473,
       "tag": "0003_work_reports_closed",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793609780708,
+      "tag": "0004_materials_stock",
+      "breakpoints": true
     }
   ]
 }
