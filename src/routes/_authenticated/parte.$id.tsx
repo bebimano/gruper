@@ -12,6 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { SignaturePad } from "@/components/SignaturePad";
 import { MaterialPicker } from "@/components/MaterialPicker";
+import { useReportContacts } from "@/components/ReportContactsAdmin";
+import { Mail } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/parte/$id")({
   head: () => ({
@@ -63,6 +65,7 @@ function Parte() {
       return data;
     },
   });
+  const contacts = useReportContacts();
 
   useEffect(() => {
     if (isNew && me.data && !r) setR(emptyReport(me.data.username.toUpperCase()));
@@ -72,13 +75,35 @@ function Parte() {
   if (!r) return <p className="p-8 text-center text-muted-foreground">{existing.isFetched && !existing.data ? "Parte no encontrado" : "Cargando…"}</p>;
 
   const closed = !!existing.data?.closed;
+  const isAdmin = !!me.data?.isAdmin;
+  const locked = closed && !isAdmin;
   const set = <K extends keyof WorkReport>(k: K, v: WorkReport[K]) => setR({ ...r, [k]: v });
   const f = (k: keyof WorkReport) => ({ value: r[k] as string, onChange: (v: string) => set(k, v as never) });
+  const contactEmail = contacts.data?.find((c) => c.name.trim().toLowerCase() === r.cliente.trim().toLowerCase())?.email;
+
+  function sendEmail() {
+    if (!contactEmail) { toast.error("Este cliente no tiene correo asociado. Pídeselo al administrador."); return; }
+    const n = existing.data?.number ?? "";
+    const body = [
+      `Parte de trabajo Nº ${n}`, `Cliente: ${r!.cliente}`, `Técnico: ${r!.tecnico}`,
+      `Máquina: ${r!.codigoMaquina}  Nº serie: ${r!.numSerie}`, "",
+      "Trabajo realizado:", ...r!.trabajos.filter((t) => t.descripcion || t.codigo).map((t) => `- ${t.codigo} ${t.descripcion} ${t.cantidad}`),
+      "", "Material utilizado:", ...r!.materialesLista.filter((t) => t.descripcion || t.codigo).map((t) => `- ${t.codigo} ${t.descripcion} x${t.cantidad}`),
+      "", `Observaciones: ${r!.observaciones}`, `Firmado por: ${r!.firmaNombre}`, "", "Gruper",
+    ].join("\n");
+    window.location.href = `mailto:${contactEmail}?subject=${encodeURIComponent(`Parte de trabajo Nº ${n} — Gruper`)}&body=${encodeURIComponent(body)}`;
+  }
+  async function requestEdit() {
+    const { error } = await supabase.rpc("request_report_edit", { _id: id });
+    if (error) { toast.error(error.message); return; }
+    toast.success("Solicitud enviada al administrador");
+    qc.invalidateQueries({ queryKey: ["work-report", id] });
+  }
 
   async function save(close: boolean) {
     if (close) {
       if (!r!.firma) { toast.error("Falta la firma del cliente"); return; }
-      if (!confirm("Una vez cerrado, el parte no se podrá modificar ni borrar. ¿Cerrar?")) return;
+      if (!closed && !confirm("Una vez cerrado, el parte no se podrá modificar ni borrar. ¿Cerrar?")) return;
     }
     setSaving(true);
     const payload = r as unknown as Json;
@@ -131,14 +156,19 @@ function Parte() {
       <div className="mt-2 mb-6">
         <p className="text-xs font-semibold uppercase tracking-wide text-primary">Servicio asistencia técnica</p>
         <h1 className="text-2xl font-bold">Parte de trabajo {existing.data ? `Nº ${existing.data.number}` : "nuevo"}</h1>
-        {closed && <p className="mt-1 text-sm text-muted-foreground">Cerrado — ya no se puede modificar ni borrar.</p>}
+        {closed && <p className="mt-1 text-sm text-muted-foreground">{isAdmin ? "Cerrado — como administrador puedes modificarlo." : "Cerrado — ya no se puede modificar ni borrar."}</p>}
       </div>
 
-      <fieldset disabled={closed} className="min-w-0">
+      <fieldset disabled={locked} className="min-w-0">
       <div className="space-y-4">
         <Section title="Datos generales">
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Cliente" {...f("cliente")} />
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-muted-foreground">Cliente</span>
+              <Input list="report-clients" value={r.cliente} onChange={(e) => set("cliente", e.target.value)} />
+              <datalist id="report-clients">{contacts.data?.map((c) => <option key={c.id} value={c.name} />)}</datalist>
+              {r.cliente && <span className="mt-1 block text-xs text-muted-foreground">{contactEmail ? `Correo: ${contactEmail}` : "Sin correo asociado"}</span>}
+            </label>
             <Field label="De" {...f("de")} />
             <Field label="Técnico" {...f("tecnico")} />
             <Field label="Vehículo" {...f("vehiculo")} />
@@ -192,7 +222,7 @@ function Parte() {
 
         <Section title="Firma del cliente">
           <Field label="Nombre de quien firma" {...f("firmaNombre")} />
-          <SignaturePad value={r.firma} onChange={(v) => set("firma", v)} disabled={closed} />
+          <SignaturePad value={r.firma} onChange={(v) => set("firma", v)} disabled={locked} />
         </Section>
       </div>
       </fieldset>
@@ -200,7 +230,18 @@ function Parte() {
       <div className="fixed inset-x-0 bottom-0 border-t border-border bg-background/95 backdrop-blur px-5 py-3 safe-bottom print:hidden">
         <div className="mx-auto max-w-3xl">
           {closed ? (
-            <p className="text-center text-sm font-medium text-muted-foreground">Parte cerrado y firmado</p>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={sendEmail}><Mail /> Enviar por correo</Button>
+              {isAdmin ? (
+                <Button className="flex-1" onClick={() => save(true)} disabled={saving}>{saving ? "Guardando…" : "Guardar cambios"}</Button>
+              ) : existing.data?.edit_requested ? (
+                <p className="flex-1 self-center text-center text-sm text-muted-foreground">Modificación solicitada</p>
+              ) : me.data?.canRequestEdit && !existing.data?.edit_used ? (
+                <Button className="flex-1" onClick={requestEdit}>Pedir modificar</Button>
+              ) : (
+                <p className="flex-1 self-center text-center text-sm text-muted-foreground">Cerrado y firmado</p>
+              )}
+            </div>
           ) : (
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => save(false)} disabled={saving}>{saving ? "Guardando…" : "Guardar"}</Button>

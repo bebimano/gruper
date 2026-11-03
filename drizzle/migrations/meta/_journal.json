@@ -36,6 +36,13 @@
       "when": 1793609780708,
       "tag": "0004_materials_stock",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793688281761,
+      "tag": "0005_report_contacts_and_edit_requests",
+      "breakpoints": true
     }
   ]
 }

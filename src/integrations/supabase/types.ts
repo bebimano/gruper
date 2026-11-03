@@ -138,22 +138,46 @@ export type Database = {
       }
       profiles: {
         Row: {
+          can_request_edit: boolean
           can_work_reports: boolean
           created_at: string
           id: string
           username: string
         }
         Insert: {
+          can_request_edit?: boolean
           can_work_reports?: boolean
           created_at?: string
           id: string
           username: string
         }
         Update: {
+          can_request_edit?: boolean
           can_work_reports?: boolean
           created_at?: string
           id?: string
           username?: string
+        }
+        Relationships: []
+      }
+      report_contacts: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
         }
         Relationships: []
       }
@@ -180,6 +204,8 @@ export type Database = {
           closed: boolean
           created_at: string
           data: Json
+          edit_requested: boolean
+          edit_used: boolean
           id: string
           number: number
           updated_at: string
@@ -189,6 +215,8 @@ export type Database = {
           closed?: boolean
           created_at?: string
           data?: Json
+          edit_requested?: boolean
+          edit_used?: boolean
           id?: string
           number?: number
           updated_at?: string
@@ -198,6 +226,8 @@ export type Database = {
           closed?: boolean
           created_at?: string
           data?: Json
+          edit_requested?: boolean
+          edit_used?: boolean
           id?: string
           number?: number
           updated_at?: string
@@ -219,6 +249,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      request_report_edit: { Args: { _id: string }; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "client"

@@ -15,6 +15,42 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { ContactMessages } from "@/components/ContactMessages";
 import { MaterialsAdmin } from "@/components/MaterialsAdmin";
+import { ReportContactsAdmin } from "@/components/ReportContactsAdmin";
+
+function EditRequests() {
+  const qc = useQueryClient();
+  const q = useQuery({
+    queryKey: ["edit-requests"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("work_reports").select("id, number, user_id, data").eq("edit_requested", true).order("number");
+      if (error) throw error;
+      return data;
+    },
+  });
+  async function decide(id: string, ok: boolean) {
+    const patch = ok ? { closed: false, edit_requested: false, edit_used: true } : { edit_requested: false, edit_used: true };
+    const { error } = await supabase.from("work_reports").update(patch).eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(ok ? "Parte reabierto para modificar" : "Solicitud rechazada");
+    qc.invalidateQueries({ queryKey: ["edit-requests"] });
+    qc.invalidateQueries({ queryKey: ["work-reports"] });
+  }
+  if (!q.data?.length) return null;
+  return (
+    <div className="rounded-xl border border-primary/40 bg-background p-4 space-y-3">
+      <h2 className="font-medium">Solicitudes de modificación</h2>
+      {q.data.map((r) => (
+        <div key={r.id} className="flex flex-wrap items-center gap-2 text-sm">
+          <Link to="/parte/$id" params={{ id: r.id }} className="flex-1 font-medium hover:text-primary">
+            Parte Nº {r.number} — {String((r.data as { cliente?: string })?.cliente ?? "")}
+          </Link>
+          <Button size="sm" onClick={() => decide(r.id, true)}>Permitir</Button>
+          <Button size="sm" variant="outline" onClick={() => decide(r.id, false)}>Rechazar</Button>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({
@@ -57,9 +93,13 @@ function Admin() {
         <TabsContent value="clients"><ClientsAdmin myId={me.data.id} /></TabsContent>
         <TabsContent value="messages"><ContactMessages /></TabsContent>
         <TabsContent value="reports">
-          <div className="mt-4 rounded-xl border border-border p-4 space-y-3">
-            <p className="text-sm text-muted-foreground">Activa "Partes de trabajo" en cada cliente desde la pestaña Clientes. Aquí ves todos los partes.</p>
-            <Button asChild variant="outline" className="w-full"><Link to="/partes"><FileText /> Ver todos los partes</Link></Button>
+          <div className="mt-4 space-y-4">
+            <div className="rounded-xl border border-border p-4 space-y-3">
+              <p className="text-sm text-muted-foreground">Activa "Partes de trabajo" en cada cliente desde la pestaña Clientes. Aquí ves todos los partes.</p>
+              <Button asChild variant="outline" className="w-full"><Link to="/partes"><FileText /> Ver todos los partes</Link></Button>
+            </div>
+            <EditRequests />
+            <ReportContactsAdmin />
           </div>
         </TabsContent>
         <TabsContent value="stock"><MaterialsAdmin /></TabsContent>
@@ -170,7 +210,7 @@ function ClientsAdmin({ myId }: { myId: string }) {
     queryKey: ["admin-clients"],
     queryFn: async () => {
       const [{ data: profiles }, { data: access }] = await Promise.all([
-        supabase.from("profiles").select("id, username, can_work_reports").order("username"),
+        supabase.from("profiles").select("id, username, can_work_reports, can_request_edit").order("username"),
         supabase.from("machine_access").select("user_id, machine_id"),
       ]);
       return (profiles ?? []).filter((p) => p.id !== myId).map((p) => ({
@@ -230,6 +270,16 @@ function ClientsAdmin({ myId }: { myId: string }) {
             <span className="flex items-center gap-2"><FileText className="h-4 w-4 text-primary" /> Partes de trabajo</span>
             <Switch checked={c.can_work_reports} onCheckedChange={(v) => toggleReports(c.id, v)} />
           </label>
+          {c.can_work_reports && (
+            <label className="flex items-center justify-between rounded-lg bg-muted/60 px-3 py-2 text-sm">
+              <span>Puede pedir modificar un parte cerrado</span>
+              <Switch checked={c.can_request_edit} onCheckedChange={async (v) => {
+                const { error } = await supabase.from("profiles").update({ can_request_edit: v }).eq("id", c.id);
+                if (error) { err(error); return; }
+                qc.invalidateQueries({ queryKey: ["admin-clients"] });
+              }} />
+            </label>
+          )}
           <div className="space-y-2">
             {machines.data?.length === 0 && <p className="text-sm text-muted-foreground">Añade máquinas primero.</p>}
             {machines.data?.map((m) => (
