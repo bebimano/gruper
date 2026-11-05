@@ -64,6 +64,35 @@ export type Database = {
           },
         ]
       }
+      machine_opens: {
+        Row: {
+          id: string
+          machine_id: string
+          opened_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          machine_id: string
+          opened_at?: string
+          user_id?: string
+        }
+        Update: {
+          id?: string
+          machine_id?: string
+          opened_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "machine_opens_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       machines: {
         Row: {
           created_at: string

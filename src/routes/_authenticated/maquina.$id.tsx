@@ -19,11 +19,21 @@ export const Route = createFileRoute("/_authenticated/maquina/$id")({
   component: Viewer,
 });
 
-// Opens the machine in the phone's real browser engine (Chrome Custom Tabs / Safari),
-// which shares Chrome's login and isn't blocked like an embedded frame.
+// Opens the machine in a full-screen web view INSIDE the app (no Chrome). It is a
+// top-level page, so portals that block frames (MB Connect) work and keep their login.
 async function openNative(url: string) {
-  const { Browser } = await import("@capacitor/browser");
-  await Browser.open({ url, toolbarColor: "#ffffff", presentationStyle: "fullscreen" });
+  const { InAppBrowser, DefaultWebViewOptions } = await import("@capacitor/inappbrowser");
+  await InAppBrowser.openInWebView({
+    url,
+    options: { ...DefaultWebViewOptions, showURL: false, showToolbar: true, closeButtonText: "Volver" },
+  });
+}
+
+async function logOpen(machineId: string) {
+  const { data } = await supabase.auth.getUser();
+  if (!data.user) return;
+  await supabase.from("machine_opens").insert({ machine_id: machineId, user_id: data.user.id });
+  window.__lovableEvents?.track?.("project.machine_opened", { machine_id: machineId });
 }
 
 function Viewer() {
@@ -41,6 +51,10 @@ function Viewer() {
   });
 
   useEffect(() => { setNative(Capacitor.isNativePlatform()); }, []);
+  const logged = useRef(false);
+  useEffect(() => {
+    if (q.data && !logged.current) { logged.current = true; void logOpen(id); }
+  }, [q.data, id]);
   useEffect(() => {
     if (native && q.data?.url && !opened.current) {
       opened.current = true;
