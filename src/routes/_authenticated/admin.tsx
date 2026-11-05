@@ -184,15 +184,84 @@ function MachinesAdmin() {
         )}
         <Button type="submit" className="w-full">Añadir máquina</Button>
       </form>
-      {machines.data?.map((m) => (
-        <div key={m.id} className="flex items-center gap-3 rounded-xl border border-border bg-background p-4">
-          <div className="flex-1 min-w-0">
-            <p className="font-medium">{m.name}</p>
-            <p className="text-xs text-muted-foreground truncate">{m.url}</p>
+      <div className="flex items-center justify-between">
+        <h2 className="font-medium">Máquinas</h2>
+        <Button size="sm" variant="outline" onClick={() => status.refetch()} disabled={status.isFetching}>
+          <RefreshCw className={status.isFetching ? "animate-spin" : ""} /> Comprobar conexión
+        </Button>
+      </div>
+      {machines.data?.map((m) => {
+        const st = status.data?.[m.id];
+        const users = access.data?.filter((a) => a.machine_id === m.id).map((a) => a.user_id) ?? [];
+        return (
+          <div key={m.id} className="rounded-xl border border-border bg-background p-4 space-y-3">
+            <div className="flex items-center gap-3">
+              <span title={st === undefined ? "Comprobando" : st ? "Conectada" : "Sin conexión"}
+                className={`h-2.5 w-2.5 shrink-0 rounded-full ${st === undefined ? "bg-muted-foreground/40 animate-pulse" : st ? "bg-success" : "bg-destructive"}`} />
+              <div className="flex-1 min-w-0">
+                <p className="font-medium">{m.name} <span className="ml-1 text-xs font-normal text-muted-foreground">{st === undefined ? "comprobando…" : st ? "conectada" : "sin conexión"}</span></p>
+                <p className="text-xs text-muted-foreground truncate">{m.url}</p>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => remove(m.id)} aria-label="Eliminar"><Trash2 /></Button>
+            </div>
+            {!!clientList.data?.length && (
+              <div className="flex flex-wrap gap-2">
+                {clientList.data.map((c) => {
+                  const on = users.includes(c.id);
+                  return (
+                    <button type="button" key={c.id} aria-pressed={on} onClick={() => toggleAccess(c.id, m.id, !on)}
+                      className={`rounded-md border px-3 py-1 text-xs transition-colors ${on ? "border-primary bg-primary text-primary-foreground" : "border-input text-muted-foreground hover:bg-muted"}`}>
+                      {c.username}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
-          <Button variant="ghost" size="icon" onClick={() => remove(m.id)} aria-label="Eliminar"><Trash2 /></Button>
-        </div>
-      ))}
+        );
+      })}
+    </div>
+  );
+}
+
+function OpensLog() {
+  const q = useQuery({
+    queryKey: ["machine-opens"],
+    queryFn: async () => {
+      const [{ data: opens, error }, { data: profiles }, { data: machines }] = await Promise.all([
+        supabase.from("machine_opens").select("id, user_id, machine_id, opened_at").order("opened_at", { ascending: false }).limit(200),
+        supabase.from("profiles").select("id, username"),
+        supabase.from("machines").select("id, name"),
+      ]);
+      if (error) throw error;
+      const u = new Map((profiles ?? []).map((p) => [p.id, p.username]));
+      const m = new Map((machines ?? []).map((x) => [x.id, x.name]));
+      return (opens ?? []).map((o) => ({ ...o, user: u.get(o.user_id) ?? "—", machine: m.get(o.machine_id) ?? "—" }));
+    },
+  });
+  const [filter, setFilter] = useState("");
+  const rows = (q.data ?? []).filter((r) => !filter || r.machine === filter);
+  const names = [...new Set((q.data ?? []).map((r) => r.machine))];
+  return (
+    <div className="mt-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <h2 className="flex-1 font-medium">Quién abre cada máquina</h2>
+        <select value={filter} onChange={(e) => setFilter(e.target.value)} className="h-9 rounded-md border border-input bg-background px-2 text-sm">
+          <option value="">Todas</option>
+          {names.map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+      </div>
+      {q.isLoading && <p className="text-sm text-muted-foreground">Cargando…</p>}
+      {!q.isLoading && !rows.length && <p className="rounded-xl border border-border p-4 text-sm text-muted-foreground">Todavía no hay accesos registrados.</p>}
+      <div className="divide-y divide-border rounded-xl border border-border bg-background">
+        {rows.map((r) => (
+          <div key={r.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+            <span className="flex-1 font-medium">{r.user}</span>
+            <span className="text-muted-foreground">{r.machine}</span>
+            <span className="w-32 text-right text-xs text-muted-foreground">{new Date(r.opened_at).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" })}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

@@ -51,6 +51,10 @@ function Viewer() {
   });
 
   useEffect(() => { setNative(Capacitor.isNativePlatform()); }, []);
+  const logged = useRef(false);
+  useEffect(() => {
+    if (q.data && !logged.current) { logged.current = true; void logOpen(id); }
+  }, [q.data, id]);
   useEffect(() => {
     if (native && q.data?.url && !opened.current) {
       opened.current = true;
