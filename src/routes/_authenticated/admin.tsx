@@ -2,7 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { ArrowLeft, Trash2, KeyRound, FileText } from "lucide-react";
+import { ArrowLeft, Trash2, KeyRound, FileText, RefreshCw } from "lucide-react";
+import { checkMachinesStatus } from "@/lib/machines.functions";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { createClientUser, deleteClientUser, resetClientPassword } from "@/lib/users.functions";
@@ -85,12 +86,14 @@ function Admin() {
         <TabsList className="w-full">
           <TabsTrigger value="machines" className="flex-1">Máquinas</TabsTrigger>
           <TabsTrigger value="clients" className="flex-1">Clientes</TabsTrigger>
+          <TabsTrigger value="opens" className="flex-1">Accesos</TabsTrigger>
           <TabsTrigger value="messages" className="flex-1">Mensajes</TabsTrigger>
           <TabsTrigger value="reports" className="flex-1">Partes</TabsTrigger>
           <TabsTrigger value="stock" className="flex-1">Stock</TabsTrigger>
         </TabsList>
         <TabsContent value="machines"><MachinesAdmin /></TabsContent>
         <TabsContent value="clients"><ClientsAdmin myId={me.data.id} /></TabsContent>
+        <TabsContent value="opens"><OpensLog /></TabsContent>
         <TabsContent value="messages"><ContactMessages /></TabsContent>
         <TabsContent value="reports">
           <div className="mt-4 space-y-4">
@@ -137,6 +140,21 @@ function MachinesAdmin() {
       return (p ?? []).filter((x) => !a.has(x.id));
     },
   });
+
+  const statusFn = useServerFn(checkMachinesStatus);
+  const status = useQuery({ queryKey: ["machine-status"], queryFn: () => statusFn(), refetchInterval: 60000 });
+  const access = useQuery({
+    queryKey: ["admin-access"],
+    queryFn: async () => (await supabase.from("machine_access").select("user_id, machine_id")).data ?? [],
+  });
+  async function toggleAccess(userId: string, machineId: string, on: boolean) {
+    const { error } = on
+      ? await supabase.from("machine_access").insert({ user_id: userId, machine_id: machineId })
+      : await supabase.from("machine_access").delete().eq("user_id", userId).eq("machine_id", machineId);
+    if (error) { err(error); return; }
+    qc.invalidateQueries({ queryKey: ["admin-access"] });
+    qc.invalidateQueries({ queryKey: ["admin-clients"] });
+  }
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
