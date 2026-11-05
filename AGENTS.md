@@ -16,3 +16,4 @@
 - Contact intake uses shared schema validation and a dedicated public server function with server-only insert; only admins can read stored messages through RLS, preventing public exposure of contact details.
 - Work reports (partes de trabajo) store the form as jsonb in work_reports; access gated by profiles.can_work_reports via the can_work_reports() RLS helper, toggled by admins — keeps form fields flexible without migrations.
 - Closed-report edit requests go through the request_report_edit() security-definer RPC (owners can't update closed rows); admin approval reopens the report and sets edit_used so it happens once.
+- Machine screens open via @capacitor/browser (Chrome Custom Tabs / Safari) on native — remote portals like MB Connect send X-Frame-Options and need the browser's cookies, so iframes fail.
