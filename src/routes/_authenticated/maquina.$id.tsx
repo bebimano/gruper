@@ -60,7 +60,6 @@ function Viewer() {
         <Link to="/maquinas" aria-label="Volver" className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-sm text-muted-foreground hover:text-primary"><ArrowLeft className="h-4 w-4" /></Link>
         <span className="flex-1 truncate text-center text-sm font-semibold">{q.data?.name ?? ""}</span>
         <button onClick={openOutside} aria-label="Abrir a pantalla completa" className="rounded-full p-1.5 text-muted-foreground hover:text-primary"><ExternalLink className="h-4 w-4" /></button>
-        {!native && <button onClick={() => setKey((k) => k + 1)} aria-label="Recargar" className="rounded-full p-1.5 text-muted-foreground hover:text-primary"><RotateCw className="h-4 w-4" /></button>}
       </header>
       {q.isLoading ? (
         <p className="m-auto text-muted-foreground">Conectando…</p>
@@ -72,8 +71,10 @@ function Viewer() {
           <button onClick={openOutside} className="rounded-md bg-primary px-5 py-2.5 font-semibold text-primary-foreground">Abrir pantalla</button>
         </div>
       ) : (
-        <iframe key={key} src={q.data.url} title={q.data.name} className="flex-1 w-full border-0"
-          allow="fullscreen; clipboard-read; clipboard-write" />
+        <div key={key} className="m-auto flex flex-col items-center gap-4 px-6 text-center">
+          <p className="text-muted-foreground">La pantalla se abre en el navegador, con tu sesión guardada.</p>
+          <a href={q.data.url} target="_blank" rel="noopener" className="rounded-md bg-primary px-5 py-2.5 font-semibold text-primary-foreground">Abrir pantalla</a>
+        </div>
       )}
     </div>
   );
