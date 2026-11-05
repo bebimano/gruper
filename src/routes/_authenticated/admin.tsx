@@ -83,7 +83,7 @@ function Admin() {
         <h1 className="mt-4 text-2xl font-bold">Administración</h1>
       </header>
       <Tabs defaultValue="machines" className="mt-2">
-        <TabsList className="w-full">
+        <TabsList className="w-full h-auto flex-wrap">
           <TabsTrigger value="machines" className="flex-1">Máquinas</TabsTrigger>
           <TabsTrigger value="clients" className="flex-1">Clientes</TabsTrigger>
           <TabsTrigger value="opens" className="flex-1">Accesos</TabsTrigger>

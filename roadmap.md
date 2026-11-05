@@ -9,3 +9,6 @@
 
 # Presentation video
 - [ ] Pending: user to choose style (paused by user's new request).
+
+# Admin tools
+- [x] In-app machine viewer (native), access assignment per machine, opens log, connection indicator.
