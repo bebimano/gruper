@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ExternalLink, RotateCw } from "lucide-react";
+import { ArrowLeft, ExternalLink } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/integrations/supabase/client";
