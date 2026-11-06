@@ -12,3 +12,4 @@
 
 # Admin tools
 - [x] In-app machine viewer (native), access assignment per machine, opens log, connection indicator.
+- [x] Fixed report emails, reports grouped by user, admin popup on new report.
