@@ -50,6 +50,13 @@
       "when": 1793897105459,
       "tag": "0006_machine_opens",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793947569395,
+      "tag": "0007_report_fixed_emails",
+      "breakpoints": true
     }
   ]
 }

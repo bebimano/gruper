@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { SignaturePad } from "@/components/SignaturePad";
 import { MaterialPicker } from "@/components/MaterialPicker";
+import { useFixedEmails } from "@/components/FixedEmailsAdmin";
 import { useReportContacts } from "@/components/ReportContactsAdmin";
 import { Mail } from "lucide-react";
 
@@ -66,6 +67,7 @@ function Parte() {
     },
   });
   const contacts = useReportContacts();
+  const fixedEmails = useFixedEmails();
 
   useEffect(() => {
     if (isNew && me.data && !r) setR(emptyReport(me.data.username.toUpperCase()));
@@ -82,7 +84,9 @@ function Parte() {
   const contactEmail = contacts.data?.find((c) => c.name.trim().toLowerCase() === r.cliente.trim().toLowerCase())?.email;
 
   function sendEmail() {
-    if (!contactEmail) { toast.error("Este cliente no tiene correo asociado. Pídeselo al administrador."); return; }
+    const fixed = (fixedEmails.data ?? []).map((x: { email: string }) => x.email);
+    const to = [...new Set([contactEmail, ...fixed].filter(Boolean))].join(",");
+    if (!to) { toast.error("No hay correos asociados. Pídeselos al administrador."); return; }
     const n = existing.data?.number ?? "";
     const body = [
       `Parte de trabajo Nº ${n}`, `Cliente: ${r!.cliente}`, `Técnico: ${r!.tecnico}`,
@@ -91,7 +95,7 @@ function Parte() {
       "", "Material utilizado:", ...r!.materialesLista.filter((t) => t.descripcion || t.codigo).map((t) => `- ${t.codigo} ${t.descripcion} x${t.cantidad}`),
       "", `Observaciones: ${r!.observaciones}`, `Firmado por: ${r!.firmaNombre}`, "", "Gruper",
     ].join("\n");
-    window.location.href = `mailto:${contactEmail}?subject=${encodeURIComponent(`Parte de trabajo Nº ${n} — Gruper`)}&body=${encodeURIComponent(body)}`;
+    window.location.href = `mailto:${to}?subject=${encodeURIComponent(`Parte de trabajo Nº ${n} — Gruper`)}&body=${encodeURIComponent(body)}`;
   }
   async function requestEdit() {
     const { error } = await supabase.rpc("request_report_edit", { _id: id });
