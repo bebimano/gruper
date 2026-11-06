@@ -84,7 +84,7 @@ function Parte() {
   const contactEmail = contacts.data?.find((c) => c.name.trim().toLowerCase() === r.cliente.trim().toLowerCase())?.email;
 
   function sendEmail() {
-    const fixed = (fixedEmails.data ?? []).map((x) => x.email);
+    const fixed = (fixedEmails.data ?? []).map((x: { email: string }) => x.email);
     const to = [...new Set([contactEmail, ...fixed].filter(Boolean))].join(",");
     if (!to) { toast.error("No hay correos asociados. Pídeselos al administrador."); return; }
     const n = existing.data?.number ?? "";

@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Plus, FileText, ChevronRight } from "lucide-react";
+import { ArrowLeft, Plus, FileText, ChevronRight, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useMe } from "@/lib/useRole";
 import { normalizeReport } from "@/lib/work-report";
@@ -26,7 +26,7 @@ function Partes() {
     queryKey: ["work-reports", me.data?.id],
     enabled: !!me.data?.canReports,
     queryFn: async () => {
-      let q = supabase.from("work_reports").select("id, number, data, created_at").order("created_at", { ascending: false });
+      let q = supabase.from("work_reports").select("id, number, data, created_at, user_id").order("created_at", { ascending: false });
       if (me.data && !me.data.isAdmin) q = q.eq("user_id", me.data.id);
       const { data, error } = await q;
       if (error) throw error;
@@ -40,7 +40,7 @@ function Partes() {
   });
   const map = new Map<string, { userId: string; name: string; items: NonNullable<typeof reports.data> }>();
   for (const r of reports.data ?? []) {
-    const g = map.get(r.user_id) ?? { userId: r.user_id, name: names.data?.get(r.user_id) ?? (r.user_id === me.data?.id ? me.data.username : "Usuario"), items: [] };
+    const g = map.get(r.user_id) ?? { userId: r.user_id, name: names.data?.get(r.user_id) ?? (r.user_id === me.data?.id ? me.data?.username ?? "" : "Usuario"), items: [] };
     g.items.push(r);
     map.set(r.user_id, g);
   }
