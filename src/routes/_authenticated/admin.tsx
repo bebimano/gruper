@@ -17,6 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { ContactMessages } from "@/components/ContactMessages";
 import { MaterialsAdmin } from "@/components/MaterialsAdmin";
 import { ReportContactsAdmin } from "@/components/ReportContactsAdmin";
+import { FixedEmailsAdmin } from "@/components/FixedEmailsAdmin";
 
 function EditRequests() {
   const qc = useQueryClient();
@@ -102,6 +103,7 @@ function Admin() {
               <Button asChild variant="outline" className="w-full"><Link to="/partes"><FileText /> Ver todos los partes</Link></Button>
             </div>
             <EditRequests />
+            <FixedEmailsAdmin />
             <ReportContactsAdmin />
           </div>
         </TabsContent>
