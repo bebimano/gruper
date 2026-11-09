@@ -41,6 +41,42 @@ export type Database = {
         }
         Relationships: []
       }
+      jobs: {
+        Row: {
+          assigned_to: string | null
+          client: string
+          created_at: string
+          description: string
+          id: string
+          status: string
+          status_note: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          client?: string
+          created_at?: string
+          description?: string
+          id?: string
+          status?: string
+          status_note?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          client?: string
+          created_at?: string
+          description?: string
+          id?: string
+          status?: string
+          status_note?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       machine_access: {
         Row: {
           machine_id: string
@@ -165,6 +201,24 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_settings: {
+        Row: {
+          enabled: boolean
+          event: string
+          recipients: string[]
+        }
+        Insert: {
+          enabled?: boolean
+          event: string
+          recipients?: string[]
+        }
+        Update: {
+          enabled?: boolean
+          event?: string
+          recipients?: string[]
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           can_request_edit: boolean
@@ -186,6 +240,27 @@ export type Database = {
           created_at?: string
           id?: string
           username?: string
+        }
+        Relationships: []
+      }
+      push_tokens: {
+        Row: {
+          platform: string
+          token: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          platform?: string
+          token: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          platform?: string
+          token?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -297,6 +372,10 @@ export type Database = {
         Returns: boolean
       }
       request_report_edit: { Args: { _id: string }; Returns: undefined }
+      set_job_status: {
+        Args: { _id: string; _note: string; _status: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "client"
