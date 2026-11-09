@@ -4,7 +4,7 @@
 - [ ] Send notifications to mbebi@gruper.es (blocked: sender domain must be configured and verified).
 # Work reports
 - [x] Client name → email directory; "Enviar por correo" opens the mail app with the report.
-- [ ] Automatic email sending with PDF (blocked: sender domain not configured).
+- [x] Automatic email sending with PDF via linked Gmail.
 - [x] Admin can edit closed reports; workers can request one edit if admin allows it.
 
 # Presentation video
