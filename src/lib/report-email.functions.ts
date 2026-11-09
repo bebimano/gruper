@@ -23,7 +23,7 @@ export const sendReportEmail = createServerFn({ method: "POST" })
     const to = [...new Set([c?.email, ...(fixed ?? []).map((f) => f.email)].filter(Boolean))] as string[];
     if (!to.length) throw new Error("No hay correos asociados a este cliente");
 
-    const key = process.env.LOVABLE_API_KEY, conn = process.env.GOOGLE_MAIL_API_KEY;
+    const key = process.env['LOVABLE_API_KEY'], conn = process.env['GOOGLE_MAIL_API_KEY'];
     if (!key || !conn) throw new Error("Gmail no está configurado");
     const boundary = "gruper" + crypto.randomUUID();
     const file = `Parte_${rep.number}.pdf`;
