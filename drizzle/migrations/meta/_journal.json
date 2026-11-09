@@ -57,6 +57,13 @@
       "when": 1793947569395,
       "tag": "0007_report_fixed_emails",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794257655326,
+      "tag": "0008_jobs_and_notifications",
+      "breakpoints": true
     }
   ]
 }
