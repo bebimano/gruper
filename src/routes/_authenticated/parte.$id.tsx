@@ -15,6 +15,9 @@ import { MaterialPicker } from "@/components/MaterialPicker";
 import { useFixedEmails } from "@/components/FixedEmailsAdmin";
 import { useReportContacts } from "@/components/ReportContactsAdmin";
 import { Mail } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { buildReportPdf } from "@/lib/report-pdf";
+import { sendReportEmail } from "@/lib/report-email.functions";
 
 export const Route = createFileRoute("/_authenticated/parte/$id")({
   head: () => ({
@@ -56,6 +59,8 @@ function Parte() {
   const qc = useQueryClient();
   const [r, setR] = useState<WorkReport | null>(null);
   const [saving, setSaving] = useState(false);
+  const [sending, setSending] = useState(false);
+  const sendFn = useServerFn(sendReportEmail);
 
   const existing = useQuery({
     queryKey: ["work-report", id],
@@ -83,19 +88,17 @@ function Parte() {
   const f = (k: keyof WorkReport) => ({ value: r[k] as string, onChange: (v: string) => set(k, v as never) });
   const contactEmail = contacts.data?.find((c) => c.name.trim().toLowerCase() === r.cliente.trim().toLowerCase())?.email;
 
-  function sendEmail() {
+  async function sendEmail() {
     const fixed = (fixedEmails.data ?? []).map((x: { email: string }) => x.email);
-    const to = [...new Set([contactEmail, ...fixed].filter(Boolean))].join(",");
-    if (!to) { toast.error("No hay correos asociados. Pídeselos al administrador."); return; }
-    const n = existing.data?.number ?? "";
-    const body = [
-      `Parte de trabajo Nº ${n}`, `Cliente: ${r!.cliente}`, `Técnico: ${r!.tecnico}`,
-      `Máquina: ${r!.codigoMaquina}  Nº serie: ${r!.numSerie}`, "",
-      "Trabajo realizado:", ...r!.trabajos.filter((t) => t.descripcion || t.codigo).map((t) => `- ${t.codigo} ${t.descripcion} ${t.cantidad}`),
-      "", "Material utilizado:", ...r!.materialesLista.filter((t) => t.descripcion || t.codigo).map((t) => `- ${t.codigo} ${t.descripcion} x${t.cantidad}`),
-      "", `Observaciones: ${r!.observaciones}`, `Firmado por: ${r!.firmaNombre}`, "", "Gruper",
-    ].join("\n");
-    window.location.href = `mailto:${to}?subject=${encodeURIComponent(`Parte de trabajo Nº ${n} — Gruper`)}&body=${encodeURIComponent(body)}`;
+    if (!contactEmail && !fixed.length) { toast.error("No hay correos asociados. Pídeselos al administrador."); return; }
+    setSending(true);
+    try {
+      const pdf = await buildReportPdf(r!, existing.data?.number ?? "");
+      const res = await sendFn({ data: { id, pdf } });
+      toast.success(`Parte enviado a ${res.to.join(", ")}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo enviar");
+    } finally { setSending(false); }
   }
   async function requestEdit() {
     const { error } = await supabase.rpc("request_report_edit", { _id: id });
@@ -235,7 +238,7 @@ function Parte() {
         <div className="mx-auto max-w-3xl">
           {closed ? (
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={sendEmail}><Mail /> Enviar por correo</Button>
+              <Button variant="outline" className="flex-1" onClick={sendEmail} disabled={sending}><Mail /> {sending ? "Enviando…" : "Enviar por correo"}</Button>
               {isAdmin ? (
                 <Button className="flex-1" onClick={() => save(true)} disabled={saving}>{saving ? "Guardando…" : "Guardar cambios"}</Button>
               ) : existing.data?.edit_requested ? (
