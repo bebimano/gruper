@@ -28,7 +28,7 @@ export async function buildReportPdf(r: WorkReport, number: string | number): Pr
       items.slice(i, i + 2).forEach(([k, v], j) => {
         const x = M + j * 91;
         doc.setFont("helvetica", "bold").text(`${k}:`, x, y);
-        doc.setFont("helvetica", "normal").text(doc.splitTextToSize(v || "—", 60)[0], x + 28, y);
+        doc.setFont("helvetica", "normal").text(String(doc.splitTextToSize(v || "—", 60)[0] ?? ""), x + 28, y);
       });
       y += 6;
     }
@@ -41,11 +41,11 @@ export async function buildReportPdf(r: WorkReport, number: string | number): Pr
   doc.setFontSize(8);
   const cols = ["Fecha", "Ida", "Km", "Mañana", "Tarde", "Vuelta", "Km"];
   const cx = [M, M + 26, M + 56, M + 70, M + 100, M + 130, M + 160];
-  doc.setFont("helvetica", "bold"); cols.forEach((c, i) => doc.text(c, cx[i], y)); doc.setFont("helvetica", "normal"); y += 5;
+  doc.setFont("helvetica", "bold"); cols.forEach((c, i) => doc.text(c, cx[i]!, y)); doc.setFont("helvetica", "normal"); y += 5;
   const rg = (a: string, b: string) => (a || b ? `${a}-${b}` : "");
   for (const d of r.dias) {
     need(6);
-    [d.fecha ? new Date(d.fecha).toLocaleDateString("es-ES") : "", rg(d.idaDe, d.idaA), d.kmIda, rg(d.mananaDe, d.mananaA), rg(d.tardeDe, d.tardeA), rg(d.vueltaDe, d.vueltaA), d.kmVuelta].forEach((v, i) => doc.text(v || "", cx[i], y));
+    [d.fecha ? new Date(d.fecha).toLocaleDateString("es-ES") : "", rg(d.idaDe, d.idaA), d.kmIda, rg(d.mananaDe, d.mananaA), rg(d.tardeDe, d.tardeA), rg(d.vueltaDe, d.vueltaA), d.kmVuelta].forEach((v, i) => doc.text(v || "", cx[i]!, y));
     y += 5;
   }
   y += 3;
@@ -69,5 +69,5 @@ export async function buildReportPdf(r: WorkReport, number: string | number): Pr
   need(45);
   if (r.firma) doc.addImage(r.firma, "PNG", M, y, 90, 30);
   y += 33; doc.setFontSize(9).text(r.firmaNombre || "", M, y);
-  return doc.output("datauristring").split(",")[1];
+  return doc.output("datauristring").split(",")[1] ?? "";
 }
