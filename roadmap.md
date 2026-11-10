@@ -13,3 +13,8 @@
 # Admin tools
 - [x] In-app machine viewer (native), access assignment per machine, opens log, connection indicator.
 - [x] Fixed report emails, reports grouped by user, admin popup on new report.
+
+# Avisos y trabajos
+- [x] Admin "Avisos" tab: enable per event (parte nuevo, nuevo trabajo, cambio de estado) and choose recipients.
+- [x] Trabajos: admin creates/assigns jobs; worker sets status + note.
+- [ ] Phone notifications with app closed (blocked: Firebase project + service account key, google-services.json / APNs key).

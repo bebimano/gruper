@@ -17,6 +17,7 @@ import { Route as SobreNosotrosRouteImport } from './routes/sobre-nosotros'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedMaquinasRouteImport } from './routes/_authenticated/maquinas'
 import { Route as AuthenticatedPartesRouteImport } from './routes/_authenticated/partes'
+import { Route as AuthenticatedTrabajosRouteImport } from './routes/_authenticated/trabajos'
 import { Route as AuthenticatedMaquinaIdRouteImport } from './routes/_authenticated/maquina.$id'
 import { Route as AuthenticatedParteIdRouteImport } from './routes/_authenticated/parte.$id'
 
@@ -59,6 +60,11 @@ const AuthenticatedPartesRoute = AuthenticatedPartesRouteImport.update({
   path: '/partes',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedTrabajosRoute = AuthenticatedTrabajosRouteImport.update({
+  id: '/trabajos',
+  path: '/trabajos',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedMaquinaIdRoute = AuthenticatedMaquinaIdRouteImport.update({
   id: '/maquina/$id',
   path: '/maquina/$id',
@@ -78,6 +84,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AuthenticatedAdminRoute
   '/maquinas': typeof AuthenticatedMaquinasRoute
   '/partes': typeof AuthenticatedPartesRoute
+  '/trabajos': typeof AuthenticatedTrabajosRoute
   '/maquina/$id': typeof AuthenticatedMaquinaIdRoute
   '/parte/$id': typeof AuthenticatedParteIdRoute
 }
@@ -89,6 +96,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AuthenticatedAdminRoute
   '/maquinas': typeof AuthenticatedMaquinasRoute
   '/partes': typeof AuthenticatedPartesRoute
+  '/trabajos': typeof AuthenticatedTrabajosRoute
   '/maquina/$id': typeof AuthenticatedMaquinaIdRoute
   '/parte/$id': typeof AuthenticatedParteIdRoute
 }
@@ -102,6 +110,7 @@ export interface FileRoutesById {
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/maquinas': typeof AuthenticatedMaquinasRoute
   '/_authenticated/partes': typeof AuthenticatedPartesRoute
+  '/_authenticated/trabajos': typeof AuthenticatedTrabajosRoute
   '/_authenticated/maquina/$id': typeof AuthenticatedMaquinaIdRoute
   '/_authenticated/parte/$id': typeof AuthenticatedParteIdRoute
 }
@@ -115,6 +124,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/maquinas'
     | '/partes'
+    | '/trabajos'
     | '/maquina/$id'
     | '/parte/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -126,6 +136,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/maquinas'
     | '/partes'
+    | '/trabajos'
     | '/maquina/$id'
     | '/parte/$id'
   id:
@@ -138,6 +149,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin'
     | '/_authenticated/maquinas'
     | '/_authenticated/partes'
+    | '/_authenticated/trabajos'
     | '/_authenticated/maquina/$id'
     | '/_authenticated/parte/$id'
   fileRoutesById: FileRoutesById
@@ -208,6 +220,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPartesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/trabajos': {
+      id: '/_authenticated/trabajos'
+      path: '/trabajos'
+      fullPath: '/trabajos'
+      preLoaderRoute: typeof AuthenticatedTrabajosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/maquina/$id': {
       id: '/_authenticated/maquina/$id'
       path: '/maquina/$id'
@@ -229,6 +248,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedMaquinasRoute: typeof AuthenticatedMaquinasRoute
   AuthenticatedPartesRoute: typeof AuthenticatedPartesRoute
+  AuthenticatedTrabajosRoute: typeof AuthenticatedTrabajosRoute
   AuthenticatedMaquinaIdRoute: typeof AuthenticatedMaquinaIdRoute
   AuthenticatedParteIdRoute: typeof AuthenticatedParteIdRoute
 }
@@ -237,6 +257,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedMaquinasRoute: AuthenticatedMaquinasRoute,
   AuthenticatedPartesRoute: AuthenticatedPartesRoute,
+  AuthenticatedTrabajosRoute: AuthenticatedTrabajosRoute,
   AuthenticatedMaquinaIdRoute: AuthenticatedMaquinaIdRoute,
   AuthenticatedParteIdRoute: AuthenticatedParteIdRoute,
 }
