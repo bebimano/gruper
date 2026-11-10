@@ -15,6 +15,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
 import { NewReportNotifier } from "@/components/NewReportNotifier";
+import { PushRegistrar } from "@/components/PushRegistrar";
 
 function NotFoundComponent() {
   return (
@@ -135,6 +136,7 @@ function RootComponent() {
       <Outlet />
       <Toaster position="top-center" />
       <NewReportNotifier />
+      <PushRegistrar />
     </QueryClientProvider>
   );
 }

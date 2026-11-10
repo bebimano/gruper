@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Monitor, LogOut, Settings, ChevronRight, FileText } from "lucide-react";
+import { Monitor, LogOut, Settings, ChevronRight, FileText, Wrench } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useMe } from "@/lib/useRole";
 import { Button } from "@/components/ui/button";
@@ -63,6 +63,11 @@ function Machines() {
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </Link>
       )}
+      <Link to="/trabajos" className="mt-3 flex items-center gap-3 rounded-xl border border-border bg-background px-4 py-3 hover:bg-muted transition-colors">
+        <Wrench className="h-5 w-5 text-primary" />
+        <span className="flex-1 font-medium">Trabajos</span>
+        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+      </Link>
       <div className="mt-6 space-y-3 flex-1">
         {machines.isLoading && <p className="text-muted-foreground">Cargando…</p>}
         {machines.data?.length === 0 && (
