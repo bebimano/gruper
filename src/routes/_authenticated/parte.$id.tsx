@@ -18,6 +18,7 @@ import { Mail } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { buildReportPdf } from "@/lib/report-pdf";
 import { sendReportEmail } from "@/lib/report-email.functions";
+import { notifyEvent } from "@/lib/notify.functions";
 
 export const Route = createFileRoute("/_authenticated/parte/$id")({
   head: () => ({
@@ -61,6 +62,7 @@ function Parte() {
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
   const sendFn = useServerFn(sendReportEmail);
+  const notifyFn = useServerFn(notifyEvent);
 
   const existing = useQuery({
     queryKey: ["work-report", id],
@@ -122,6 +124,7 @@ function Parte() {
     toast.success(close ? "Parte cerrado" : "Parte guardado");
     qc.invalidateQueries({ queryKey: ["work-reports"] });
     qc.invalidateQueries({ queryKey: ["work-report", res.data.id] });
+    if (isNew) notifyFn({ data: { event: "new_report", id: res.data.id } }).catch(() => {});
     if (isNew) navigate({ to: "/parte/$id", params: { id: res.data.id }, replace: true });
   }
   async function remove() {

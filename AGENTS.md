@@ -17,3 +17,4 @@
 - Work reports (partes de trabajo) store the form as jsonb in work_reports; access gated by profiles.can_work_reports via the can_work_reports() RLS helper, toggled by admins — keeps form fields flexible without migrations.
 - Closed-report edit requests go through the request_report_edit() security-definer RPC (owners can't update closed rows); admin approval reopens the report and sets edit_used so it happens once.
 - Machine screens open in-app via @capacitor/inappbrowser openInWebView on native (top-level webview, so X-Frame-Options portals work); web falls back to a new tab. Opens are logged to machine_opens (admin-read RLS) plus project.machine_opened.
+- Phone push uses Firebase Cloud Messaging HTTP v1 (FIREBASE_SERVICE_ACCOUNT secret) for Android and iOS; tokens in push_tokens, per-event recipients in notification_settings, sent by notifyEvent which re-reads the row via RLS — one sender path for both platforms.
