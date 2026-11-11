@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1002595734749",
+    "project_id": "gruper-remote",
+    "storage_bucket": "gruper-remote.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1002595734749:android:948f9d354de39714b5f734",
+        "android_client_info": {
+          "package_name": "app.gruper.remote"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDR9OK9mf2XhAoD6BtpDNBeEaDjQ4yOQD4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
