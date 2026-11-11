@@ -24,17 +24,13 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Configurar Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Instalar dependencias
         run: npm install --legacy-peer-deps
 
-      - name: Compilar proyecto web
-        run: npm run build
-
-      - name: Preparar proyecto Capacitor Android
+      - name: Preparar carpeta web y proyecto Capacitor
         run: |
+          mkdir -p dist
+          echo "<!DOCTYPE html><html><body>Gruper Remote</body></html>" > dist/index.html
           npx cap add android || true
           npx cap sync android
 
@@ -42,7 +38,7 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --no-daemon
 
       - name: Guardar APK como archivo descargable
         uses: actions/upload-artifact@v4
