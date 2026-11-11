@@ -33,6 +33,9 @@ jobs:
           echo "<!DOCTYPE html><html><body>Gruper Remote</body></html>" > dist/index.html
           npx cap add android || true
           npx cap sync android
+          # Ajustar versión mínima de Android a 26 requerida por el visor web in-app
+          sed -i -E 's/(minSdkVersion|minSdk)\s*=\s*[0-9]+/\1 = 26/g' android/variables.gradle || true
+          sed -i -E 's/(minSdkVersion|minSdk)\s*=\s*[0-9]+/\1 = 26/g' android/app/build.gradle || true
 
       - name: Compilar APK Debug
         run: |
