@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Car, MapPin, CheckCircle2, Clock, Gauge, ArrowRight } from "lucide-react";
+import { Car, MapPin, CheckCircle2, Clock, Gauge, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +31,39 @@ export function WorkTimeTracker({ dias = [], onChange, disabled = false }: WorkT
   const fakeReport: WorkReport = { dias } as WorkReport;
   const totals = calculateReportTotals(fakeReport);
 
+  const getEnsuredDias = (): Dia[] => {
+    if (dias.length > 0) return [...dias];
+    return [
+      {
+        fecha: getTodayDateStr(),
+        idaDe: "",
+        idaA: "",
+        kmIda: "",
+        mananaDe: "",
+        mananaA: "",
+        tardeDe: "",
+        tardeA: "",
+        vueltaDe: "",
+        vueltaA: "",
+        kmVuelta: "",
+      },
+    ];
+  };
+
+  const updateFecha = (nuevaFecha: string) => {
+    const list = getEnsuredDias();
+    const idx = list.length - 1;
+    list[idx] = { ...list[idx]!, fecha: nuevaFecha };
+    onChange(list);
+  };
+
+  const updateKm = (field: "kmIda" | "kmVuelta", val: string) => {
+    const list = getEnsuredDias();
+    const idx = list.length - 1;
+    list[idx] = { ...list[idx]!, [field]: val };
+    onChange(list);
+  };
+
   const openModal = (type: ModalType) => {
     if (disabled) return;
     const nowTime = getCurrentTimeStr();
@@ -48,64 +81,42 @@ export function WorkTimeTracker({ dias = [], onChange, disabled = false }: WorkT
   };
 
   const handleConfirm = () => {
-    const today = getTodayDateStr();
-    const updatedDias: Dia[] = [...dias];
-
-    // Ensure at least one day exists
-    if (updatedDias.length === 0) {
-      updatedDias.push({
-        fecha: today,
-        idaDe: "",
-        idaA: "",
-        kmIda: "",
-        mananaDe: "",
-        mananaA: "",
-        tardeDe: "",
-        tardeA: "",
-        vueltaDe: "",
-        vueltaA: "",
-        kmVuelta: "",
-      });
-    }
-
-    const idx = updatedDias.length - 1;
-    const day = { ...updatedDias[idx]! };
-    if (!day.fecha) day.fecha = today;
+    const list = getEnsuredDias();
+    const idx = list.length - 1;
+    const day = { ...list[idx]! };
+    if (!day.fecha) day.fecha = getTodayDateStr();
 
     if (modalType === "salida") {
       day.idaDe = tempTime;
       if (tempKm.trim()) day.kmIda = tempKm.trim();
-      updatedDias[idx] = day;
-      onChange(updatedDias);
+      list[idx] = day;
+      onChange(list);
       toast.success(`🚗 Salida hacia cliente registrada a las ${tempTime}`);
     } else if (modalType === "llegada") {
       day.idaA = tempTime;
-      // Start working in client
       const [h] = tempTime.split(":").map(Number);
       if (h !== undefined && h >= 14) {
         if (!day.tardeDe) day.tardeDe = tempTime;
       } else {
         if (!day.mananaDe) day.mananaDe = tempTime;
       }
-      updatedDias[idx] = day;
-      onChange(updatedDias);
+      list[idx] = day;
+      onChange(list);
       toast.success(`📍 Llegada registrada a las ${tempTime}. ¡Mano de obra iniciada!`);
     } else if (modalType === "fin") {
-      // End work time
       const [h] = tempTime.split(":").map(Number);
       if (day.tardeDe || (h !== undefined && h >= 14)) {
         day.tardeA = tempTime;
       } else {
         day.mananaA = tempTime;
       }
-      // Start return trip
       day.vueltaDe = tempTime;
       if (tempKm.trim()) day.kmVuelta = tempKm.trim();
 
-      updatedDias[idx] = day;
-      onChange(updatedDias);
+      list[idx] = day;
+      onChange(list);
 
-      const newTotals = calculateReportTotals({ dias: updatedDias } as WorkReport);
+      const newTotals = calculateReportTotals({ dias: list } as WorkReport);
       toast.success(
         `🏁 Fin de trabajo registrado a las ${tempTime}. Total: ${newTotals.formattedWorkHours} y ${newTotals.totalKm} km.`
       );
@@ -119,7 +130,7 @@ export function WorkTimeTracker({ dias = [], onChange, disabled = false }: WorkT
   const hasFin = !!(currentDay?.tardeA || currentDay?.mananaA || currentDay?.vueltaDe);
 
   return (
-    <div className="space-y-3 rounded-xl border border-primary/30 bg-primary/5 p-4 shadow-sm print:hidden">
+    <div className="space-y-3.5 rounded-xl border border-primary/30 bg-primary/5 p-4 shadow-sm print:hidden">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-primary/15 pb-2.5">
         <div className="flex items-center gap-2">
           <Clock className="h-4 w-4 text-primary" />
@@ -128,8 +139,52 @@ export function WorkTimeTracker({ dias = [], onChange, disabled = false }: WorkT
           </h3>
         </div>
         <span className="text-[11px] text-muted-foreground">
-          Pulsa cada botón para registrar horas y kilómetros en tiempo real
+          Registro rápido en tiempo real para facturación
         </span>
+      </div>
+
+      {/* FECHA Y KILÓMETROS */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-background p-3 rounded-xl border border-border">
+        <div>
+          <label className="block text-xs font-semibold text-muted-foreground mb-1 flex items-center gap-1.5">
+            <Calendar className="h-3.5 w-3.5 text-primary" /> Fecha de trabajo
+          </label>
+          <Input
+            type="date"
+            value={currentDay?.fecha || getTodayDateStr()}
+            disabled={disabled}
+            onChange={(e) => updateFecha(e.target.value)}
+            className="h-9 text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-muted-foreground mb-1 flex items-center gap-1.5">
+            <Car className="h-3.5 w-3.5 text-primary" /> Km de Ida
+          </label>
+          <Input
+            type="text"
+            placeholder="Ej. 45"
+            value={currentDay?.kmIda || ""}
+            disabled={disabled}
+            onChange={(e) => updateKm("kmIda", e.target.value)}
+            className="h-9 text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-muted-foreground mb-1 flex items-center gap-1.5">
+            <Car className="h-3.5 w-3.5 text-primary" /> Km de Vuelta
+          </label>
+          <Input
+            type="text"
+            placeholder="Ej. 45"
+            value={currentDay?.kmVuelta || ""}
+            disabled={disabled}
+            onChange={(e) => updateKm("kmVuelta", e.target.value)}
+            className="h-9 text-sm"
+          />
+        </div>
       </div>
 
       {/* BOTONES DE CONTROL DE TIEMPO RÁPIDO */}
@@ -152,7 +207,7 @@ export function WorkTimeTracker({ dias = [], onChange, disabled = false }: WorkT
             <div>
               <p className="text-xs font-semibold text-foreground">1. Salida hacia cliente</p>
               <p className="text-[11px] text-muted-foreground">
-                {hasSalida ? `Salida: ${currentDay?.idaDe}` : "Toca para registrar salida"}
+                {hasSalida ? `Hora: ${currentDay?.idaDe}` : "Pulsar al salir"}
               </p>
             </div>
           </div>
@@ -177,7 +232,7 @@ export function WorkTimeTracker({ dias = [], onChange, disabled = false }: WorkT
             <div>
               <p className="text-xs font-semibold text-foreground">2. Llegada a cliente</p>
               <p className="text-[11px] text-muted-foreground">
-                {hasLlegada ? `Llegada: ${currentDay?.idaA}` : "Inicia mano de obra"}
+                {hasLlegada ? `Hora: ${currentDay?.idaA}` : "Inicia mano de obra"}
               </p>
             </div>
           </div>
@@ -213,7 +268,7 @@ export function WorkTimeTracker({ dias = [], onChange, disabled = false }: WorkT
       </div>
 
       {/* RESUMEN DE TOTALES CALCULADOS AUTOMÁTICAMENTE */}
-      <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2 rounded-lg bg-background p-3 border border-border/80">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 rounded-xl bg-background p-3 border border-border">
         <div>
           <span className="block text-[10px] font-medium uppercase text-muted-foreground flex items-center gap-1">
             <Clock className="h-3 w-3 text-primary" /> Mano de obra
@@ -234,7 +289,7 @@ export function WorkTimeTracker({ dias = [], onChange, disabled = false }: WorkT
 
         <div className="col-span-2 sm:col-span-1">
           <span className="block text-[10px] font-medium uppercase text-muted-foreground flex items-center gap-1">
-            <Car className="h-3 w-3 text-primary" /> Tiempo viaje (Ida+Vuelta)
+            <Car className="h-3 w-3 text-primary" /> Tiempo viaje
           </span>
           <span className="text-base font-bold text-foreground">
             {totals.formattedTravelHours || "0 min"}
@@ -242,7 +297,7 @@ export function WorkTimeTracker({ dias = [], onChange, disabled = false }: WorkT
         </div>
       </div>
 
-      {/* DIÁLOGO / MODAL RÁPIDO PARA CONFIRMAR O AJUSTAR HORA Y KM */}
+      {/* DIÁLOGO / MODAL RÁPIDO PARA REGISTRAR HORA */}
       <Dialog open={modalType !== null} onOpenChange={(open) => !open && setModalType(null)}>
         <DialogContent className="max-w-md p-5">
           <DialogHeader>
@@ -305,7 +360,7 @@ export function WorkTimeTracker({ dias = [], onChange, disabled = false }: WorkT
                   className="text-base"
                 />
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  Se ha sugerido automáticamente la misma distancia de ida ({currentDay?.kmIda || "—"} Km).
+                  Se sugiere la misma distancia que la ida ({currentDay?.kmIda || "—"} Km).
                 </p>
               </div>
             )}

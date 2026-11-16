@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Plus, Printer, Trash2, X, Cpu, Download, Mail, Send } from "lucide-react";
+import { ArrowLeft, Plus, Printer, Trash2, X, Cpu, Download, Mail, Send, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
@@ -21,6 +21,7 @@ import { sendReportEmail } from "@/lib/report-email.functions";
 import { notifyEvent } from "@/lib/notify.functions";
 import { ReportPhotos } from "@/components/ReportPhotos";
 import { WorkTimeTracker } from "@/components/WorkTimeTracker";
+import { DietasGastosSelector } from "@/components/DietasGastosSelector";
 
 export const Route = createFileRoute("/_authenticated/parte/$id")({
   head: () => ({
@@ -380,32 +381,6 @@ function Parte() {
             onChange={(dias) => set("dias", dias)}
             disabled={locked}
           />
-
-          {r.dias.map((d, i) => {
-            const upd = (k: keyof typeof d) => ({ value: d[k], onChange: (v: string) => set("dias", r.dias.map((x, j) => (j === i ? { ...x, [k]: v } : x))) });
-            return (
-              <div key={i} className="rounded-lg bg-muted/60 p-3 space-y-3">
-                <div className="flex items-end gap-2">
-                  <div className="flex-1"><Field label="Fecha" type="date" {...upd("fecha")} /></div>
-                  <Button type="button" variant="ghost" size="icon" className="print:hidden" aria-label="Quitar día" onClick={() => set("dias", r.dias.filter((_, j) => j !== i))}><X /></Button>
-                </div>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <Field label="Ida de" type="time" {...upd("idaDe")} />
-                  <Field label="Ida a" type="time" {...upd("idaA")} />
-                  <Field label="Km ida" {...upd("kmIda")} />
-                  <span className="hidden sm:block" />
-                  <Field label="Mañana de" type="time" {...upd("mananaDe")} />
-                  <Field label="Mañana a" type="time" {...upd("mananaA")} />
-                  <Field label="Tarde de" type="time" {...upd("tardeDe")} />
-                  <Field label="Tarde a" type="time" {...upd("tardeA")} />
-                  <Field label="Vuelta de" type="time" {...upd("vueltaDe")} />
-                  <Field label="Vuelta a" type="time" {...upd("vueltaA")} />
-                  <Field label="Km vuelta" {...upd("kmVuelta")} />
-                </div>
-              </div>
-            );
-          })}
-          <Button type="button" variant="outline" size="sm" className="print:hidden" onClick={() => set("dias", [...r.dias, emptyDia()])}><Plus /> Añadir día</Button>
         </Section>
 
         <Section title="Trabajo realizado">{lines("trabajos", "Código (ej. MONTAJES)")}</Section>
@@ -415,6 +390,14 @@ function Parte() {
           <ReportPhotos
             fotos={r.fotos ?? []}
             onChange={(fotos) => set("fotos", fotos)}
+            disabled={locked}
+          />
+        </Section>
+
+        <Section title="Dietas y Pernoctas">
+          <DietasGastosSelector
+            dietas={r.dietas}
+            onChange={(dietas) => set("dietas", dietas)}
             disabled={locked}
           />
         </Section>
@@ -447,19 +430,18 @@ function Parte() {
                   {saving ? "Guardando…" : sending ? "Enviando…" : "Guardar cambios y reenviar"}
                 </Button>
               ) : existing.data?.edit_requested ? (
-                <p className="flex-1 self-center text-center text-sm text-muted-foreground">Modificación solicitada</p>
-              ) : me.data?.canRequestEdit && !existing.data?.edit_used ? (
-                <Button className="flex-1" onClick={requestEdit}>Pedir modificar</Button>
+                <Button variant="outline" className="flex-1 text-xs sm:text-sm" disabled>
+                  <Clock className="h-4 w-4 mr-1.5" /> Modificación solicitada
+                </Button>
               ) : (
-                <p className="flex-1 self-center text-center text-sm text-muted-foreground">Cerrado y firmado</p>
+                <Button variant="outline" className="flex-1 text-xs sm:text-sm font-medium" onClick={requestEdit}>
+                  Pedir modificar el parte
+                </Button>
               )}
             </div>
           ) : (
             <div className="flex gap-2">
-              <Button variant="outline" className="w-1/3" onClick={saveDraft} disabled={saving || sending}>
-                {saving ? "Guardando…" : "Borrador"}
-              </Button>
-              <Button className="flex-1 font-semibold" onClick={saveAndClose} disabled={saving || sending}>
+              <Button className="w-full font-semibold" onClick={saveAndClose} disabled={saving || sending}>
                 <Send className="h-4 w-4 mr-1.5" />
                 {saving ? "Cerrando parte…" : sending ? "Enviando correo…" : "Cerrar y enviar parte"}
               </Button>

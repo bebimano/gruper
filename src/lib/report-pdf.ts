@@ -175,10 +175,41 @@ export async function generatePdfDoc(r: WorkReport, number: string | number, cre
   }
 
   title("Cierre");
-  pairs([["Solicitado por", r.solicitadoPor], ["", ""]]);
+  pairs([["Solicitado por", r.solicitadoPor || "—"], ["", ""]]);
+
+  if (r.dietas) {
+    const d = r.dietas;
+    const esp: string[] = [];
+    if (d.desayunoEsp > 0) esp.push(`${d.desayunoEsp} Desayuno${d.desayunoEsp > 1 ? "s" : ""}`);
+    if (d.comidaEsp > 0) esp.push(`${d.comidaEsp} Comida${d.comidaEsp > 1 ? "s" : ""}`);
+    if (d.cenaEsp > 0) esp.push(`${d.cenaEsp} Cena${d.cenaEsp > 1 ? "s" : ""}`);
+    if (d.pernoctaEsp > 0) esp.push(`${d.pernoctaEsp} Pernocta${d.pernoctaEsp > 1 ? "s" : ""}`);
+
+    const ext: string[] = [];
+    if (d.desayunoExt > 0) ext.push(`${d.desayunoExt} Desayuno${d.desayunoExt > 1 ? "s" : ""}`);
+    if (d.comidaExt > 0) ext.push(`${d.comidaExt} Comida${d.comidaExt > 1 ? "s" : ""}`);
+    if (d.cenaExt > 0) ext.push(`${d.cenaExt} Cena${d.cenaExt > 1 ? "s" : ""}`);
+    if (d.pernoctaExt > 0) ext.push(`${d.pernoctaExt} Pernocta${d.pernoctaExt > 1 ? "s" : ""}`);
+
+    if (esp.length > 0 || ext.length > 0) {
+      need(10);
+      doc.setFont("helvetica", "bold").setFontSize(8.5).setTextColor(30);
+      if (esp.length > 0) {
+        doc.text(`Dietas España: ${esp.join(" · ")}`, M, y);
+        y += 5;
+      }
+      if (ext.length > 0) {
+        doc.text(`Dietas Extranjero: ${ext.join(" · ")}`, M, y);
+        y += 5;
+      }
+      doc.setFont("helvetica", "normal");
+      y += 1;
+    }
+  }
+
   const obs = doc.splitTextToSize(`Observaciones: ${r.observaciones || "—"}`, W - 2 * M);
   need(obs.length * 4.5);
-  doc.text(obs, M, y);
+  doc.setFontSize(9).text(obs, M, y);
   y += obs.length * 4.5 + 4;
 
   title("Firma del cliente");
