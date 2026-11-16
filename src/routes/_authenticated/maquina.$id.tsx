@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ExternalLink, RotateCw, Maximize2, Loader2 } from "lucide-react";
+import { ArrowLeft, ExternalLink } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/integrations/supabase/client";
@@ -40,10 +40,7 @@ function Viewer() {
   const { id } = Route.useParams();
   const [key, setKey] = useState(0);
   const [native, setNative] = useState(false);
-  const [iframeLoading, setIframeLoading] = useState(true);
-  const containerRef = useRef<HTMLDivElement>(null);
   const opened = useRef(false);
-
   const q = useQuery({
     queryKey: ["machine", id],
     queryFn: async () => {
@@ -71,62 +68,15 @@ function Viewer() {
     else window.open(q.data.url, "_blank", "noopener");
   };
 
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      containerRef.current?.requestFullscreen?.().catch(() => {});
-    } else {
-      document.exitFullscreen?.().catch(() => {});
-    }
-  };
-
   return (
-    <div ref={containerRef} className="fixed inset-0 flex flex-col bg-background z-50">
-      <header className="flex items-center gap-2 px-3 py-2 border-b border-border bg-background safe-top z-20">
-        <Link
-          to="/maquinas"
-          aria-label="Volver a mis máquinas"
-          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span className="hidden sm:inline">Máquinas</span>
-        </Link>
+    <div className="fixed inset-0 flex flex-col bg-background">
+      <header className="flex items-center gap-2 px-3 pb-1 safe-top">
+        <Link to="/maquinas" aria-label="Volver" className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-sm text-muted-foreground hover:text-primary"><ArrowLeft className="h-4 w-4" /></Link>
         <span className="flex-1 truncate text-center text-sm font-semibold">{q.data?.name ?? ""}</span>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => {
-              setIframeLoading(true);
-              setKey((k) => k + 1);
-            }}
-            aria-label="Recargar pantalla"
-            title="Recargar pantalla"
-            className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          >
-            <RotateCw className="h-4 w-4" />
-          </button>
-          <button
-            onClick={toggleFullscreen}
-            aria-label="Pantalla completa"
-            title="Pantalla completa"
-            className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          >
-            <Maximize2 className="h-4 w-4" />
-          </button>
-          <button
-            onClick={openOutside}
-            aria-label="Abrir en pestaña nueva"
-            title="Abrir en pestaña nueva"
-            className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          >
-            <ExternalLink className="h-4 w-4" />
-          </button>
-        </div>
+        <button onClick={openOutside} aria-label="Abrir a pantalla completa" className="rounded-full p-1.5 text-muted-foreground hover:text-primary"><ExternalLink className="h-4 w-4" /></button>
       </header>
-
       {q.isLoading ? (
-        <div className="m-auto flex flex-col items-center gap-2 text-muted-foreground">
-          <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          <p className="text-sm">Conectando a la máquina…</p>
-        </div>
+        <p className="m-auto text-muted-foreground">Conectando…</p>
       ) : !q.data ? (
         <p className="m-auto text-muted-foreground">Máquina no disponible</p>
       ) : native ? (
@@ -135,23 +85,9 @@ function Viewer() {
           <button onClick={openOutside} className="rounded-md bg-primary px-5 py-2.5 font-semibold text-primary-foreground">Abrir pantalla</button>
         </div>
       ) : (
-        <div className="relative flex-1 w-full h-full bg-black overflow-hidden flex flex-col">
-          {iframeLoading && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/90 z-10 gap-2">
-              <Loader2 className="h-7 w-7 animate-spin text-primary" />
-              <p className="text-sm font-medium text-foreground">Conectando a {q.data.name}...</p>
-              <p className="text-xs text-muted-foreground">Cargando visor VNC integrado</p>
-            </div>
-          )}
-          <iframe
-            key={key}
-            src={q.data.url}
-            title={q.data.name}
-            className="flex-1 w-full h-full border-0"
-            allow="fullscreen; clipboard-read; clipboard-write; autoplay; camera; microphone"
-            allowFullScreen
-            onLoad={() => setIframeLoading(false)}
-          />
+        <div key={key} className="m-auto flex flex-col items-center gap-4 px-6 text-center">
+          <p className="text-muted-foreground">La pantalla se abre en el navegador, con tu sesión guardada.</p>
+          <a href={q.data.url} target="_blank" rel="noopener" className="rounded-md bg-primary px-5 py-2.5 font-semibold text-primary-foreground">Abrir pantalla</a>
         </div>
       )}
     </div>
