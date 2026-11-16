@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Plus, Printer, Trash2, X, Cpu, Download } from "lucide-react";
+import { ArrowLeft, Plus, Printer, Trash2, X, Cpu, Download, Mail, Send } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
@@ -15,7 +15,6 @@ import { MaterialPicker } from "@/components/MaterialPicker";
 import { useFixedEmails } from "@/components/FixedEmailsAdmin";
 import { useReportContacts } from "@/components/ReportContactsAdmin";
 import { useClientEquipment } from "@/components/ClientEquipmentAdmin";
-import { Mail } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { buildReportPdf, downloadReportPdf, getReportFilename } from "@/lib/report-pdf";
 import { sendReportEmail } from "@/lib/report-email.functions";
@@ -152,24 +151,73 @@ function Parte() {
     qc.invalidateQueries({ queryKey: ["work-report", id] });
   }
 
-  async function save(close: boolean) {
-    if (close) {
-      if (!r!.firma) { toast.error("Falta la firma del cliente"); return; }
-      if (!closed && !confirm("Una vez cerrado, el parte no se podrá modificar ni borrar. ¿Cerrar?")) return;
+  async function saveDraft() {
+    setSaving(true);
+    try {
+      const payload = r as unknown as Json;
+      const res = isNew
+        ? await supabase.from("work_reports").insert({ data: payload, closed: false }).select("id, number, user_number").single()
+        : await supabase.from("work_reports").update({ data: payload, closed: false, updated_at: new Date().toISOString() }).eq("id", id).select("id, number, user_number").single();
+      if (res.error) throw res.error;
+      toast.success("Borrador guardado");
+      qc.invalidateQueries({ queryKey: ["work-reports"] });
+      qc.invalidateQueries({ queryKey: ["work-report", res.data.id] });
+      if (isNew) notifyFn({ data: { event: "new_report", id: res.data.id } }).catch(() => {});
+      if (isNew) navigate({ to: "/parte/$id", params: { id: res.data.id }, replace: true });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error al guardar");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveAndClose() {
+    if (!r!.firma) {
+      toast.error("Falta la firma del cliente antes de cerrar");
+      return;
     }
     setSaving(true);
-    const payload = r as unknown as Json;
-    const res = isNew
-      ? await supabase.from("work_reports").insert({ data: payload, closed: close }).select("id, number, user_number").single()
-      : await supabase.from("work_reports").update({ data: payload, closed: close, updated_at: new Date().toISOString() }).eq("id", id).select("id, number, user_number").single();
-    setSaving(false);
-    if (res.error) { toast.error(res.error.message); return; }
-    toast.success(close ? "Parte cerrado" : "Parte guardado");
-    qc.invalidateQueries({ queryKey: ["work-reports"] });
-    qc.invalidateQueries({ queryKey: ["work-report", res.data.id] });
-    if (isNew) notifyFn({ data: { event: "new_report", id: res.data.id } }).catch(() => {});
-    if (isNew) navigate({ to: "/parte/$id", params: { id: res.data.id }, replace: true });
+    try {
+      const payload = r as unknown as Json;
+      const res = isNew
+        ? await supabase.from("work_reports").insert({ data: payload, closed: true }).select("id, number, user_number").single()
+        : await supabase.from("work_reports").update({ data: payload, closed: true, updated_at: new Date().toISOString() }).eq("id", id).select("id, number, user_number").single();
+
+      if (res.error) throw res.error;
+      const savedId = res.data.id;
+      const savedNum = res.data.user_number ?? res.data.number;
+      toast.success("Parte cerrado");
+      qc.invalidateQueries({ queryKey: ["work-reports"] });
+      qc.invalidateQueries({ queryKey: ["work-report", savedId] });
+      if (isNew) notifyFn({ data: { event: "new_report", id: savedId } }).catch(() => {});
+
+      // Envío automático del correo
+      const fixed = (fixedEmails.data ?? []).map((x: { email: string }) => x.email);
+      if (contactEmail || fixed.length) {
+        setSending(true);
+        try {
+          const pdf = await buildReportPdf(r!, savedNum, creatorName);
+          const emailRes = await sendFn({ data: { id: savedId, pdf } });
+          toast.success(`Parte enviado por correo a ${emailRes.to.join(", ")}`);
+        } catch (mailErr) {
+          toast.error(mailErr instanceof Error ? `Parte cerrado, pero falló el envío: ${mailErr.message}` : "Parte cerrado, pero no se pudo enviar el correo");
+        } finally {
+          setSending(false);
+        }
+      } else {
+        toast.info("Parte cerrado. No se envió correo porque no hay correos asociados.");
+      }
+
+      if (isNew) {
+        navigate({ to: "/parte/$id", params: { id: savedId }, replace: true });
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error al guardar y cerrar");
+    } finally {
+      setSaving(false);
+    }
   }
+
   async function remove() {
     if (!confirm("¿Eliminar este parte?")) return;
     const { error } = await supabase.from("work_reports").delete().eq("id", id);
@@ -182,18 +230,39 @@ function Parte() {
     <div className="space-y-2">
       {r[key].map((l, i) => {
         const upd = (p: Partial<Linea>) => set(key, r[key].map((x, j) => (j === i ? { ...x, ...p } : x)));
+        if (key === "trabajos") {
+          return (
+            <div key={i} className="flex items-start gap-2">
+              <Textarea
+                placeholder="Descripción del trabajo realizado..."
+                rows={2}
+                value={l.descripcion}
+                onChange={(e) => upd({ descripcion: e.target.value })}
+                className="flex-1 min-h-11"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="print:hidden text-muted-foreground hover:text-destructive shrink-0"
+                aria-label="Quitar línea"
+                onClick={() => set(key, r[key].filter((_, j) => j !== i))}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          );
+        }
         return (
           <div key={i} className="grid grid-cols-[1fr_4.5rem_auto] gap-2 sm:grid-cols-[8rem_1fr_5rem_auto] items-start">
-            {key === "materialesLista"
-              ? <MaterialPicker value={l.codigo} placeholder={codeLabel} onChange={(v) => upd({ codigo: v })} onPick={(m) => upd({ codigo: m.codigo, descripcion: m.descripcion })} />
-              : <Input placeholder={codeLabel} value={l.codigo} onChange={(e) => upd({ codigo: e.target.value })} className="col-span-3 sm:col-span-1" />}
+            <MaterialPicker value={l.codigo} placeholder={codeLabel} onChange={(v) => upd({ codigo: v })} onPick={(m) => upd({ codigo: m.codigo, descripcion: m.descripcion })} />
             <Textarea placeholder="Descripción" rows={2} value={l.descripcion} onChange={(e) => upd({ descripcion: e.target.value })} className="min-h-11" />
             <Input placeholder="Cant." value={l.cantidad} onChange={(e) => upd({ cantidad: e.target.value })} />
-            <Button type="button" variant="ghost" size="icon" className="print:hidden" aria-label="Quitar línea" onClick={() => set(key, r[key].filter((_, j) => j !== i))}><X /></Button>
+            <Button type="button" variant="ghost" size="icon" className="print:hidden text-muted-foreground hover:text-destructive shrink-0" aria-label="Quitar línea" onClick={() => set(key, r[key].filter((_, j) => j !== i))}><X className="h-4 w-4" /></Button>
           </div>
         );
       })}
-      <Button type="button" variant="outline" size="sm" className="print:hidden" onClick={() => set(key, [...r[key], emptyLinea()])}><Plus /> Añadir línea</Button>
+      <Button type="button" variant="outline" size="sm" className="print:hidden" onClick={() => set(key, [...r[key], emptyLinea()])}><Plus className="h-4 w-4 mr-1" /> Añadir línea</Button>
     </div>
   );
 
@@ -353,9 +422,14 @@ function Parte() {
         <div className="mx-auto max-w-3xl">
           {closed ? (
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={sendEmail} disabled={sending}><Mail /> {sending ? "Enviando…" : "Enviar por correo"}</Button>
+              <Button variant="outline" className="flex-1" onClick={sendEmail} disabled={sending}>
+                <Mail className="h-4 w-4 mr-1.5" /> {sending ? "Enviando…" : "Reenviar por correo"}
+              </Button>
               {isAdmin ? (
-                <Button className="flex-1" onClick={() => save(true)} disabled={saving}>{saving ? "Guardando…" : "Guardar cambios"}</Button>
+                <Button className="flex-1 font-semibold" onClick={saveAndClose} disabled={saving || sending}>
+                  <Send className="h-4 w-4 mr-1.5" />
+                  {saving ? "Guardando…" : sending ? "Enviando…" : "Guardar cambios y reenviar"}
+                </Button>
               ) : existing.data?.edit_requested ? (
                 <p className="flex-1 self-center text-center text-sm text-muted-foreground">Modificación solicitada</p>
               ) : me.data?.canRequestEdit && !existing.data?.edit_used ? (
@@ -366,8 +440,13 @@ function Parte() {
             </div>
           ) : (
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => save(false)} disabled={saving}>{saving ? "Guardando…" : "Guardar"}</Button>
-              <Button className="flex-1" onClick={() => save(true)} disabled={saving}>Cerrar parte</Button>
+              <Button variant="outline" className="w-1/3" onClick={saveDraft} disabled={saving || sending}>
+                {saving ? "Guardando…" : "Borrador"}
+              </Button>
+              <Button className="flex-1 font-semibold" onClick={saveAndClose} disabled={saving || sending}>
+                <Send className="h-4 w-4 mr-1.5" />
+                {saving ? "Cerrando parte…" : sending ? "Enviando correo…" : "Cerrar y enviar parte"}
+              </Button>
             </div>
           )}
         </div>

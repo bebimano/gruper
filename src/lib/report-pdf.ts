@@ -105,22 +105,27 @@ export async function generatePdfDoc(r: WorkReport, number: string | number, cre
   }
   y += 3;
 
-  const lines = (t: string, ls: WorkReport["trabajos"]) => {
-    title(t);
-    doc.setFontSize(9);
-    for (const l of ls.filter((x) => x.codigo || x.descripcion)) {
-      const desc = doc.splitTextToSize(l.descripcion || "", 120);
-      need(desc.length * 4.5 + 2);
-      doc.text(l.codigo || "", M, y);
-      doc.text(desc, M + 34, y);
-      doc.text(l.cantidad || "", W - M, y, { align: "right" });
-      y += desc.length * 4.5 + 1.5;
-    }
-    y += 3;
-  };
+  title("Trabajo realizado");
+  doc.setFontSize(9);
+  for (const l of r.trabajos.filter((x) => x.descripcion?.trim())) {
+    const desc = doc.splitTextToSize(`• ${l.descripcion.trim()}`, W - 2 * M);
+    need(desc.length * 4.5 + 2);
+    doc.text(desc, M, y);
+    y += desc.length * 4.5 + 1.5;
+  }
+  y += 3;
 
-  lines("Trabajo realizado", r.trabajos);
-  lines("Material utilizado", r.materialesLista);
+  title("Material utilizado");
+  doc.setFontSize(9);
+  for (const l of r.materialesLista.filter((x) => x.codigo || x.descripcion)) {
+    const desc = doc.splitTextToSize(l.descripcion || "", 120);
+    need(desc.length * 4.5 + 2);
+    doc.text(l.codigo || "", M, y);
+    doc.text(desc, M + 34, y);
+    doc.text(l.cantidad || "", W - M, y, { align: "right" });
+    y += desc.length * 4.5 + 1.5;
+  }
+  y += 3;
 
   title("Cierre");
   pairs([["Solicitado por", r.solicitadoPor], ["", ""]]);
