@@ -9,15 +9,17 @@ export function useMe() {
       if (!u.user) return null;
       const [{ data: roles }, { data: profile }] = await Promise.all([
         supabase.from("user_roles").select("role").eq("user_id", u.user.id),
-        supabase.from("profiles").select("username, can_work_reports, can_request_edit").eq("id", u.user.id).maybeSingle(),
+        supabase.from("profiles").select("*").eq("id", u.user.id).maybeSingle(),
       ]);
       const isAdmin = !!roles?.some((r) => r.role === "admin");
+      const p = profile as any;
       return {
         id: u.user.id,
-        username: profile?.username ?? "",
+        username: p?.username ?? "",
         isAdmin,
-        canReports: isAdmin || !!profile?.can_work_reports,
-        canRequestEdit: !!profile?.can_request_edit,
+        canReports: isAdmin || !!p?.can_work_reports,
+        canRequestEdit: !!p?.can_request_edit,
+        canViewAllReports: isAdmin || !!p?.can_view_all_reports,
       };
     },
   });

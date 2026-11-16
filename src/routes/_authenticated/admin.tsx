@@ -7,6 +7,7 @@ import { checkMachinesStatus } from "@/lib/machines.functions";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { createUserAccount, deleteClientUser, resetClientPassword, setUserRole } from "@/lib/users.functions";
+import { setUserReportViewAccess } from "@/lib/reports.functions";
 import { useMe } from "@/lib/useRole";
 import logo from "@/assets/gruper-logo.png.asset.json";
 import { Button } from "@/components/ui/button";
@@ -300,6 +301,7 @@ function ClientsAdmin({ myId }: { myId: string }) {
   const deleteFn = useServerFn(deleteClientUser);
   const resetFn = useServerFn(resetClientPassword);
   const setRoleFn = useServerFn(setUserRole);
+  const setViewAllFn = useServerFn(setUserReportViewAccess);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [newRole, setNewRole] = useState<"admin" | "client">("client");
@@ -308,17 +310,21 @@ function ClientsAdmin({ myId }: { myId: string }) {
     queryKey: ["admin-clients"],
     queryFn: async () => {
       const [{ data: profiles }, { data: access }, { data: roles }] = await Promise.all([
-        supabase.from("profiles").select("id, username, can_work_reports, can_request_edit").order("username"),
+        supabase.from("profiles").select("*").order("username"),
         supabase.from("machine_access").select("user_id, machine_id"),
         supabase.from("user_roles").select("user_id, role"),
       ]);
       const roleMap = new Map((roles ?? []).map((r) => [r.user_id, r.role]));
-      return (profiles ?? []).filter((p) => p.id !== myId).map((p) => ({
-        ...p,
-        role: (roleMap.get(p.id) as "admin" | "client") ?? "client",
-        isAdmin: roleMap.get(p.id) === "admin",
-        machineIds: new Set((access ?? []).filter((a) => a.user_id === p.id).map((a) => a.machine_id)),
-      }));
+      return (profiles ?? []).filter((p) => p.id !== myId).map((p) => {
+        const item = p as any;
+        return {
+          ...item,
+          can_view_all_reports: !!item.can_view_all_reports,
+          role: (roleMap.get(item.id) as "admin" | "client") ?? "client",
+          isAdmin: roleMap.get(item.id) === "admin",
+          machineIds: new Set((access ?? []).filter((a) => a.user_id === item.id).map((a) => a.machine_id)),
+        };
+      });
     },
   });
 
@@ -454,14 +460,31 @@ function ClientsAdmin({ myId }: { myId: string }) {
                 <Switch checked={c.can_work_reports} onCheckedChange={(v) => toggleReports(c.id, v)} />
               </label>
               {c.can_work_reports && (
-                <label className="flex items-center justify-between rounded-lg bg-muted/60 px-3 py-2 text-sm">
-                  <span>Puede pedir modificar un parte cerrado</span>
-                  <Switch checked={c.can_request_edit} onCheckedChange={async (v) => {
-                    const { error } = await supabase.from("profiles").update({ can_request_edit: v }).eq("id", c.id);
-                    if (error) { err(error); return; }
-                    qc.invalidateQueries({ queryKey: ["admin-clients"] });
-                  }} />
-                </label>
+                <>
+                  <label className="flex items-center justify-between rounded-lg bg-muted/60 px-3 py-2 text-sm">
+                    <span>Puede pedir modificar un parte cerrado</span>
+                    <Switch checked={c.can_request_edit} onCheckedChange={async (v) => {
+                      const { error } = await supabase.from("profiles").update({ can_request_edit: v }).eq("id", c.id);
+                      if (error) { err(error); return; }
+                      qc.invalidateQueries({ queryKey: ["admin-clients"] });
+                    }} />
+                  </label>
+                  <label className="flex items-center justify-between rounded-lg bg-muted/60 px-3 py-2 text-sm">
+                    <div>
+                      <span className="block font-medium">Ver partes de otros trabajadores</span>
+                      <span className="block text-xs text-muted-foreground">Permite ver los partes de todos los clientes creados por otros compañeros</span>
+                    </div>
+                    <Switch checked={c.can_view_all_reports} onCheckedChange={async (v) => {
+                      try {
+                        await setViewAllFn({ data: { id: c.id, enabled: v } });
+                        toast.success(v ? "Permiso para ver todos los partes concedido" : "Permiso revocado");
+                        qc.invalidateQueries({ queryKey: ["admin-clients"] });
+                      } catch (e) {
+                        err(e);
+                      }
+                    }} />
+                  </label>
+                </>
               )}
               <div className="space-y-2 pt-1">
                 <p className="text-xs font-medium text-muted-foreground">Máquinas asignadas:</p>

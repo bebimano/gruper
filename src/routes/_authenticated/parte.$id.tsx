@@ -19,6 +19,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { buildReportPdf, downloadReportPdf, getReportFilename } from "@/lib/report-pdf";
 import { sendReportEmail } from "@/lib/report-email.functions";
 import { notifyEvent } from "@/lib/notify.functions";
+import { logReportOpen } from "@/lib/reports.functions";
 import { ReportPhotos } from "@/components/ReportPhotos";
 import { WorkTimeTracker } from "@/components/WorkTimeTracker";
 import { DietasGastosSelector } from "@/components/DietasGastosSelector";
@@ -67,6 +68,15 @@ function Parte() {
   const [downloading, setDownloading] = useState(false);
   const sendFn = useServerFn(sendReportEmail);
   const notifyFn = useServerFn(notifyEvent);
+  const logOpenFn = useServerFn(logReportOpen);
+
+  useEffect(() => {
+    if (!isNew && id && id !== "nuevo") {
+      logOpenFn({ data: { id } }).catch((err) => {
+        console.error("Error logging report open:", err);
+      });
+    }
+  }, [id, isNew]);
 
   const existing = useQuery({
     queryKey: ["work-report", id],
