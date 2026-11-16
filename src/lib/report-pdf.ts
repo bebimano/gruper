@@ -67,17 +67,17 @@ export async function generatePdfDoc(r: WorkReport, number: string | number, cre
   title("Datos generales");
   pairs([
     ["Cliente", r.cliente],
-    ["De", r.de],
+    ["Dirección", r.direccion || "—"],
+    ["Población (De)", r.de || "—"],
     ["Creado por", creatorName || "—"],
-    ["Técnico", r.tecnico],
-    ["Vehículo", r.vehiculo],
-    ["Código máquina", r.codigoMaquina],
-    ["Nº serie", r.numSerie],
-    ["Reparación", r.reparacion],
-    ["Suministro", r.suministro],
-    ["Materiales", r.materiales],
-    ["Instalación", r.instalacion],
-    ["", ""],
+    ["Técnico", r.tecnico || "—"],
+    ["Vehículo", r.vehiculo || "—"],
+    ["Modelo / Máq.", r.codigoMaquina || "—"],
+    ["Nº serie", r.numSerie || "—"],
+    ["Reparación", r.reparacion || "—"],
+    ["Suministro", r.suministro || "—"],
+    ["Materiales", r.materiales || "—"],
+    ["Instalación", r.instalacion || "—"],
   ]);
 
   title("Horas de trabajo");

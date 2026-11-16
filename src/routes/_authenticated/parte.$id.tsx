@@ -227,14 +227,33 @@ function Parte() {
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-muted-foreground">Cliente</span>
-              <Input list="report-clients" value={r.cliente} onChange={(e) => set("cliente", e.target.value)} />
+              <Input
+                list="report-clients"
+                value={r.cliente}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const match = (allEquipment.data ?? []).find(
+                    (eq) => eq.client_name.trim().toLowerCase() === val.trim().toLowerCase(),
+                  );
+                  setR((prev) => {
+                    if (!prev) return null;
+                    return {
+                      ...prev,
+                      cliente: val,
+                      de: match?.poblacion ? match.poblacion : prev.de,
+                      direccion: match?.direccion ? match.direccion : prev.direccion,
+                    };
+                  });
+                }}
+              />
               <datalist id="report-clients">{contacts.data?.map((c) => <option key={c.id} value={c.name} />)}</datalist>
               {r.cliente && <span className="mt-1 block text-xs text-muted-foreground">{contactEmail ? `Correo: ${contactEmail}` : "Sin correo asociado"}</span>}
             </label>
-            <Field label="De" {...f("de")} />
+            <Field label="Dirección" {...f("direccion")} />
+            <Field label="Población (De)" {...f("de")} />
             <Field label="Técnico" {...f("tecnico")} />
             <Field label="Vehículo" {...f("vehiculo")} />
-            <Field label="Código máquina" {...f("codigoMaquina")} />
+            <Field label="Modelo / Código máquina" {...f("codigoMaquina")} />
             <Field label="Nº serie" {...f("numSerie")} />
             <Field label="Reparación" {...f("reparacion")} />
             <Field label="Suministro" {...f("suministro")} />
@@ -246,7 +265,7 @@ function Parte() {
           {clientEquipment.length > 0 && (
             <div className="mt-3 rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-2 print:hidden">
               <p className="text-xs font-semibold text-primary flex items-center gap-1.5">
-                <Cpu className="h-3.5 w-3.5" /> Máquinas de {r.cliente} — pulsa para rellenar código y nº serie:
+                <Cpu className="h-3.5 w-3.5" /> Máquinas de {r.cliente} — pulsa para rellenar modelo, nº serie y dirección:
               </p>
               <div className="flex flex-wrap gap-2">
                 {clientEquipment.map((eq) => (
@@ -254,14 +273,23 @@ function Parte() {
                     key={eq.id}
                     type="button"
                     onClick={() => {
-                      set("codigoMaquina", eq.tipo_maquina);
-                      set("numSerie", eq.num_serie);
+                      setR((prev) => {
+                        if (!prev) return null;
+                        return {
+                          ...prev,
+                          codigoMaquina: eq.modelo || eq.tipo_maquina,
+                          numSerie: eq.num_serie,
+                          de: eq.poblacion || prev.de,
+                          direccion: eq.direccion || prev.direccion,
+                        };
+                      });
+                      toast.success(`Modelo "${eq.modelo || eq.tipo_maquina}" cargado`);
                     }}
                     className="rounded-lg border border-primary/30 bg-background px-3 py-1.5 text-left text-sm transition-colors hover:bg-primary/10 hover:border-primary"
                   >
                     <span className="font-medium">{eq.tipo_maquina}</span>
-                    {eq.modelo && <span className="ml-1.5 text-muted-foreground text-xs">{eq.modelo}</span>}
-                    <span className="ml-1.5 font-mono text-xs text-muted-foreground">· {eq.num_serie}</span>
+                    {eq.modelo && <span className="ml-1.5 font-semibold text-primary">· {eq.modelo}</span>}
+                    <span className="ml-1.5 font-mono text-xs text-muted-foreground">· Nº {eq.num_serie}</span>
                   </button>
                 ))}
               </div>

@@ -6,7 +6,7 @@ export type Dia = {
 export type Linea = { codigo: string; descripcion: string; cantidad: string };
 
 export type WorkReport = {
-  cliente: string; de: string; tecnico: string; vehiculo: string;
+  cliente: string; direccion: string; de: string; tecnico: string; vehiculo: string;
   codigoMaquina: string; numSerie: string; reparacion: string; suministro: string;
   materiales: string; instalacion: string;
   dias: Dia[]; trabajos: Linea[]; materialesLista: Linea[];
@@ -19,7 +19,7 @@ export const emptyLinea = (): Linea => ({ codigo: "", descripcion: "", cantidad:
 
 export function emptyReport(tecnico = ""): WorkReport {
   return {
-    cliente: "", de: "", tecnico, vehiculo: "", codigoMaquina: "", numSerie: "",
+    cliente: "", direccion: "", de: "", tecnico, vehiculo: "", codigoMaquina: "", numSerie: "",
     reparacion: "", suministro: "", materiales: "", instalacion: "",
     dias: [emptyDia()], trabajos: [emptyLinea()], materialesLista: [emptyLinea()],
     solicitadoPor: "", observaciones: "", firmaNombre: "", firma: "",
@@ -29,5 +29,12 @@ export function emptyReport(tecnico = ""): WorkReport {
 export function normalizeReport(d: unknown): WorkReport {
   const base = emptyReport();
   const o = (d && typeof d === "object" ? d : {}) as Partial<WorkReport>;
-  return { ...base, ...o, dias: o.dias?.length ? o.dias : base.dias, trabajos: o.trabajos?.length ? o.trabajos : base.trabajos, materialesLista: o.materialesLista?.length ? o.materialesLista : base.materialesLista };
+  return {
+    ...base,
+    ...o,
+    direccion: o.direccion ?? "",
+    dias: o.dias?.length ? o.dias : base.dias,
+    trabajos: o.trabajos?.length ? o.trabajos : base.trabajos,
+    materialesLista: o.materialesLista?.length ? o.materialesLista : base.materialesLista,
+  };
 }
