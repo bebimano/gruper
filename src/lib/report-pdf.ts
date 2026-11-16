@@ -1,6 +1,7 @@
 import { jsPDF } from "jspdf";
 import logo from "@/assets/gruper-logo.png.asset.json";
 import type { WorkReport } from "@/lib/work-report";
+import { calculateReportTotals } from "@/lib/time-calculator";
 
 async function toDataUrl(url: string): Promise<string | null> {
   try {
@@ -103,7 +104,20 @@ export async function generatePdfDoc(r: WorkReport, number: string | number, cre
     ].forEach((v, i) => doc.text(v || "", cx[i]!, y));
     y += 5;
   }
-  y += 3;
+  y += 2;
+
+  const totals = calculateReportTotals(r);
+  if (totals.totalKm > 0 || totals.totalWorkMinutes > 0 || totals.totalTravelMinutes > 0) {
+    need(9);
+    doc.setFillColor(240, 247, 255).rect(M, y, W - 2 * M, 6.5, "F");
+    doc.setFont("helvetica", "bold").setFontSize(8).setTextColor(37, 159, 253);
+    const summaryText = `TOTALES CALCULADOS:  Mano de obra: ${totals.formattedWorkHours}   |   Desplazamiento: ${totals.totalKm} Km${totals.formattedTravelHours ? ` (${totals.formattedTravelHours} viaje)` : ""}`;
+    doc.text(summaryText, M + 3, y + 4.5);
+    doc.setTextColor(0).setFont("helvetica", "normal");
+    y += 9.5;
+  } else {
+    y += 1;
+  }
 
   title("Trabajo realizado");
   doc.setFontSize(9);

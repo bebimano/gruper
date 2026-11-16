@@ -20,6 +20,7 @@ import { buildReportPdf, downloadReportPdf, getReportFilename } from "@/lib/repo
 import { sendReportEmail } from "@/lib/report-email.functions";
 import { notifyEvent } from "@/lib/notify.functions";
 import { ReportPhotos } from "@/components/ReportPhotos";
+import { WorkTimeTracker } from "@/components/WorkTimeTracker";
 
 export const Route = createFileRoute("/_authenticated/parte/$id")({
   head: () => ({
@@ -374,6 +375,12 @@ function Parte() {
         </Section>
 
         <Section title="Horas de trabajo">
+          <WorkTimeTracker
+            dias={r.dias}
+            onChange={(dias) => set("dias", dias)}
+            disabled={locked}
+          />
+
           {r.dias.map((d, i) => {
             const upd = (k: keyof typeof d) => ({ value: d[k], onChange: (v: string) => set("dias", r.dias.map((x, j) => (j === i ? { ...x, [k]: v } : x))) });
             return (

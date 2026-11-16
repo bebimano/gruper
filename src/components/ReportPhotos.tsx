@@ -120,11 +120,12 @@ export function ReportPhotos({ fotos = [], onChange, disabled = false }: ReportP
             + Otra foto
           </Button>
 
-          {/* Inputs ocultos para cámara o selector */}
+          {/* Inputs ocultos para cámara directa */}
           <input
             ref={inputAntesRef}
             type="file"
             accept="image/*"
+            capture="environment"
             className="sr-only"
             onChange={(e) => {
               const file = e.target.files?.[0];
@@ -136,6 +137,7 @@ export function ReportPhotos({ fotos = [], onChange, disabled = false }: ReportP
             ref={inputDespuesRef}
             type="file"
             accept="image/*"
+            capture="environment"
             className="sr-only"
             onChange={(e) => {
               const file = e.target.files?.[0];
@@ -147,6 +149,7 @@ export function ReportPhotos({ fotos = [], onChange, disabled = false }: ReportP
             ref={inputGeneralRef}
             type="file"
             accept="image/*"
+            capture="environment"
             className="sr-only"
             onChange={(e) => {
               const file = e.target.files?.[0];
