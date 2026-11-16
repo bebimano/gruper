@@ -38,6 +38,19 @@ async function assertAdmin(supabase: any, userId: string) {
   if (!data) throw new Error("No autorizado");
 }
 
+const createUserSchema = credsSchema.extend({
+  role: z.enum(["admin", "client"]).default("client"),
+});
+
+export const createUserAccount = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => createUserSchema.parse(d))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.supabase, context.userId);
+    const id = await createAccount(data.username, data.password, data.role ?? "client");
+    return { id };
+  });
+
 export const createClientUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => credsSchema.parse(d))
@@ -45,6 +58,28 @@ export const createClientUser = createServerFn({ method: "POST" })
     await assertAdmin(context.supabase, context.userId);
     const id = await createAccount(data.username, data.password, "client");
     return { id };
+  });
+
+export const setUserRole = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        role: z.enum(["admin", "client"]),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.supabase, context.userId);
+    if (data.id === context.userId && data.role !== "admin") {
+      throw new Error("No puedes quitarte el rol de administrador a ti mismo");
+    }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.from("user_roles").delete().eq("user_id", data.id);
+    const { error } = await supabaseAdmin.from("user_roles").insert({ user_id: data.id, role: data.role });
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
 
 export const deleteClientUser = createServerFn({ method: "POST" })

@@ -2,14 +2,15 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { ArrowLeft, Trash2, KeyRound, FileText, RefreshCw } from "lucide-react";
+import { ArrowLeft, Trash2, KeyRound, FileText, RefreshCw, Shield } from "lucide-react";
 import { checkMachinesStatus } from "@/lib/machines.functions";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { createClientUser, deleteClientUser, resetClientPassword } from "@/lib/users.functions";
+import { createUserAccount, deleteClientUser, resetClientPassword, setUserRole } from "@/lib/users.functions";
 import { useMe } from "@/lib/useRole";
 import logo from "@/assets/gruper-logo.png.asset.json";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -87,7 +88,7 @@ function Admin() {
       <Tabs defaultValue="machines" className="mt-2">
         <TabsList className="w-full h-auto flex-wrap">
           <TabsTrigger value="machines" className="flex-1">Máquinas</TabsTrigger>
-          <TabsTrigger value="clients" className="flex-1">Clientes</TabsTrigger>
+          <TabsTrigger value="clients" className="flex-1">Usuarios</TabsTrigger>
           <TabsTrigger value="opens" className="flex-1">Accesos</TabsTrigger>
           <TabsTrigger value="messages" className="flex-1">Mensajes</TabsTrigger>
           <TabsTrigger value="reports" className="flex-1">Partes</TabsTrigger>
@@ -101,7 +102,7 @@ function Admin() {
         <TabsContent value="reports">
           <div className="mt-4 space-y-4">
             <div className="rounded-xl border border-border p-4 space-y-3">
-              <p className="text-sm text-muted-foreground">Activa "Partes de trabajo" en cada cliente desde la pestaña Clientes. Aquí ves todos los partes.</p>
+              <p className="text-sm text-muted-foreground">Activa "Partes de trabajo" en cada cliente desde la pestaña Usuarios. Los administradores tienen acceso automático a todos los partes.</p>
               <Button asChild variant="outline" className="w-full"><Link to="/partes"><FileText /> Ver todos los partes</Link></Button>
             </div>
             <EditRequests />
@@ -292,21 +293,27 @@ function OpensLog() {
 function ClientsAdmin({ myId }: { myId: string }) {
   const qc = useQueryClient();
   const machines = useMachines();
-  const createFn = useServerFn(createClientUser);
+  const createFn = useServerFn(createUserAccount);
   const deleteFn = useServerFn(deleteClientUser);
   const resetFn = useServerFn(resetClientPassword);
+  const setRoleFn = useServerFn(setUserRole);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [newRole, setNewRole] = useState<"admin" | "client">("client");
 
   const clients = useQuery({
     queryKey: ["admin-clients"],
     queryFn: async () => {
-      const [{ data: profiles }, { data: access }] = await Promise.all([
+      const [{ data: profiles }, { data: access }, { data: roles }] = await Promise.all([
         supabase.from("profiles").select("id, username, can_work_reports, can_request_edit").order("username"),
         supabase.from("machine_access").select("user_id, machine_id"),
+        supabase.from("user_roles").select("user_id, role"),
       ]);
+      const roleMap = new Map((roles ?? []).map((r) => [r.user_id, r.role]));
       return (profiles ?? []).filter((p) => p.id !== myId).map((p) => ({
         ...p,
+        role: (roleMap.get(p.id) as "admin" | "client") ?? "client",
+        isAdmin: roleMap.get(p.id) === "admin",
         machineIds: new Set((access ?? []).filter((a) => a.user_id === p.id).map((a) => a.machine_id)),
       }));
     },
@@ -315,11 +322,31 @@ function ClientsAdmin({ myId }: { myId: string }) {
   async function add(e: React.FormEvent) {
     e.preventDefault();
     try {
-      await createFn({ data: { username, password } });
-      toast.success(`Cliente ${username} creado`);
-      setUsername(""); setPassword("");
+      await createFn({ data: { username, password, role: newRole } });
+      toast.success(`Usuario ${username} creado como ${newRole === "admin" ? "Administrador" : "Cliente"}`);
+      setUsername(""); setPassword(""); setNewRole("client");
       qc.invalidateQueries({ queryKey: ["admin-clients"] });
+      qc.invalidateQueries({ queryKey: ["admin-client-list"] });
     } catch (e) { err(e); }
+  }
+  async function toggleRole(id: string, name: string, targetRole: "admin" | "client") {
+    const isPromoting = targetRole === "admin";
+    if (
+      !confirm(
+        isPromoting
+          ? `¿Dar acceso total de Administrador a "${name}"?\nTendrá acceso completo a todas las opciones, máquinas, partes y administración.`
+          : `¿Cambiar a "${name}" a rol Cliente?\nPerderá el acceso de administrador y sus máquinas se asignarán individualmente.`,
+      )
+    )
+      return;
+    try {
+      await setRoleFn({ data: { id, role: targetRole } });
+      toast.success(`${name} ahora es ${isPromoting ? "Administrador" : "Cliente"}`);
+      qc.invalidateQueries({ queryKey: ["admin-clients"] });
+      qc.invalidateQueries({ queryKey: ["admin-client-list"] });
+    } catch (e) {
+      err(e);
+    }
   }
   async function toggle(userId: string, machineId: string, on: boolean) {
     const { error } = on
@@ -334,8 +361,12 @@ function ClientsAdmin({ myId }: { myId: string }) {
     qc.invalidateQueries({ queryKey: ["admin-clients"] });
   }
   async function remove(id: string, name: string) {
-    if (!confirm(`¿Eliminar al cliente ${name}?`)) return;
-    try { await deleteFn({ data: { id } }); qc.invalidateQueries({ queryKey: ["admin-clients"] }); } catch (e) { err(e); }
+    if (!confirm(`¿Eliminar al usuario ${name}?`)) return;
+    try {
+      await deleteFn({ data: { id } });
+      qc.invalidateQueries({ queryKey: ["admin-clients"] });
+      qc.invalidateQueries({ queryKey: ["admin-client-list"] });
+    } catch (e) { err(e); }
   }
   async function reset(id: string) {
     const pw = prompt("Nueva contraseña (mínimo 6 caracteres)");
@@ -346,41 +377,101 @@ function ClientsAdmin({ myId }: { myId: string }) {
   return (
     <div className="space-y-4 mt-4">
       <form onSubmit={add} className="space-y-3 rounded-xl border border-border bg-background p-4">
-        <h2 className="font-medium">Nuevo cliente</h2>
+        <h2 className="font-medium">Nuevo usuario</h2>
         <Input placeholder="Usuario" value={username} onChange={(e) => setUsername(e.target.value)} required autoCapitalize="none" />
         <Input placeholder="Contraseña" value={password} onChange={(e) => setPassword(e.target.value)} required />
-        <Button type="submit" className="w-full">Crear cliente</Button>
+
+        <div className="space-y-1.5 pt-1">
+          <label className="text-xs font-medium text-muted-foreground">Tipo de cuenta / Nivel de acceso:</label>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setNewRole("client")}
+              className={`rounded-lg border p-2.5 text-left text-sm transition-colors ${
+                newRole === "client"
+                  ? "border-primary bg-primary/10 font-medium text-primary ring-1 ring-primary"
+                  : "border-border text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              <div className="font-medium text-foreground">Cliente / Operario</div>
+              <div className="text-xs text-muted-foreground">Acceso solo a opciones y máquinas asignadas</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setNewRole("admin")}
+              className={`rounded-lg border p-2.5 text-left text-sm transition-colors ${
+                newRole === "admin"
+                  ? "border-primary bg-primary/10 font-medium text-primary ring-1 ring-primary"
+                  : "border-border text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              <div className="flex items-center gap-1.5 font-medium text-foreground">
+                <Shield className="h-3.5 w-3.5 text-primary" /> Administrador
+              </div>
+              <div className="text-xs text-muted-foreground">Acceso total a todas las opciones de la app</div>
+            </button>
+          </div>
+        </div>
+
+        <Button type="submit" className="w-full">Crear usuario</Button>
       </form>
       {clients.data?.map((c) => (
         <div key={c.id} className="rounded-xl border border-border bg-background p-4 space-y-3">
           <div className="flex items-center gap-2">
-            <p className="flex-1 font-medium">{c.username}</p>
+            <div className="flex-1 flex items-center gap-2">
+              <p className="font-medium">{c.username}</p>
+              <Badge variant={c.isAdmin ? "default" : "outline"} className={c.isAdmin ? "bg-primary text-primary-foreground gap-1" : ""}>
+                {c.isAdmin && <Shield className="h-3 w-3" />}
+                {c.isAdmin ? "Administrador" : "Cliente"}
+              </Badge>
+            </div>
             <Button variant="ghost" size="icon" onClick={() => reset(c.id)} aria-label="Cambiar contraseña"><KeyRound /></Button>
             <Button variant="ghost" size="icon" onClick={() => remove(c.id, c.username)} aria-label="Eliminar"><Trash2 /></Button>
           </div>
-          <label className="flex items-center justify-between rounded-lg bg-muted/60 px-3 py-2 text-sm">
-            <span className="flex items-center gap-2"><FileText className="h-4 w-4 text-primary" /> Partes de trabajo</span>
-            <Switch checked={c.can_work_reports} onCheckedChange={(v) => toggleReports(c.id, v)} />
+
+          <label className="flex items-center justify-between rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-sm">
+            <div className="flex items-center gap-2 font-medium">
+              <Shield className="h-4 w-4 text-primary" />
+              <span>Acceso de Administrador (todas las opciones)</span>
+            </div>
+            <Switch
+              checked={c.isAdmin}
+              onCheckedChange={(v) => toggleRole(c.id, c.username, v ? "admin" : "client")}
+            />
           </label>
-          {c.can_work_reports && (
-            <label className="flex items-center justify-between rounded-lg bg-muted/60 px-3 py-2 text-sm">
-              <span>Puede pedir modificar un parte cerrado</span>
-              <Switch checked={c.can_request_edit} onCheckedChange={async (v) => {
-                const { error } = await supabase.from("profiles").update({ can_request_edit: v }).eq("id", c.id);
-                if (error) { err(error); return; }
-                qc.invalidateQueries({ queryKey: ["admin-clients"] });
-              }} />
-            </label>
-          )}
-          <div className="space-y-2">
-            {machines.data?.length === 0 && <p className="text-sm text-muted-foreground">Añade máquinas primero.</p>}
-            {machines.data?.map((m) => (
-              <label key={m.id} className="flex items-center gap-3 text-sm">
-                <Checkbox checked={c.machineIds.has(m.id)} onCheckedChange={(v) => toggle(c.id, m.id, v === true)} />
-                {m.name}
+
+          {c.isAdmin ? (
+            <p className="rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+              ✨ Este usuario es <strong>Administrador</strong>: tiene acceso automático y completo a todas las máquinas, todos los partes de trabajo, stock, avisos y gestión de la app.
+            </p>
+          ) : (
+            <>
+              <label className="flex items-center justify-between rounded-lg bg-muted/60 px-3 py-2 text-sm">
+                <span className="flex items-center gap-2"><FileText className="h-4 w-4 text-primary" /> Partes de trabajo</span>
+                <Switch checked={c.can_work_reports} onCheckedChange={(v) => toggleReports(c.id, v)} />
               </label>
-            ))}
-          </div>
+              {c.can_work_reports && (
+                <label className="flex items-center justify-between rounded-lg bg-muted/60 px-3 py-2 text-sm">
+                  <span>Puede pedir modificar un parte cerrado</span>
+                  <Switch checked={c.can_request_edit} onCheckedChange={async (v) => {
+                    const { error } = await supabase.from("profiles").update({ can_request_edit: v }).eq("id", c.id);
+                    if (error) { err(error); return; }
+                    qc.invalidateQueries({ queryKey: ["admin-clients"] });
+                  }} />
+                </label>
+              )}
+              <div className="space-y-2 pt-1">
+                <p className="text-xs font-medium text-muted-foreground">Máquinas asignadas:</p>
+                {machines.data?.length === 0 && <p className="text-sm text-muted-foreground">Añade máquinas primero.</p>}
+                {machines.data?.map((m) => (
+                  <label key={m.id} className="flex items-center gap-3 text-sm">
+                    <Checkbox checked={c.machineIds.has(m.id)} onCheckedChange={(v) => toggle(c.id, m.id, v === true)} />
+                    {m.name}
+                  </label>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       ))}
     </div>
