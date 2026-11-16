@@ -9,6 +9,7 @@ export type ReportPhoto = {
   id: string;
   tipo: "antes" | "despues" | "otro";
   titulo?: string;
+  descripcion?: string;
   url: string;
 };
 

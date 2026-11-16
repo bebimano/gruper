@@ -132,10 +132,13 @@ export async function generatePdfDoc(r: WorkReport, number: string | number, cre
     title("Fotografías del trabajo (Antes / Después)");
     const gap = 6;
     const photoW = (W - 2 * M - gap) / 2;
-    const photoH = 55;
+    const photoH = 50;
     for (let i = 0; i < validFotos.length; i += 2) {
-      need(photoH + 14);
       const batch = validFotos.slice(i, i + 2);
+      const maxDescLen = Math.max(...batch.map((f) => (f.descripcion?.trim() ? doc.splitTextToSize(f.descripcion.trim(), photoW).length : 0)));
+      const extraH = maxDescLen > 0 ? maxDescLen * 3.5 + 4 : 0;
+
+      need(photoH + 12 + extraH);
       batch.forEach((f, idx) => {
         const x = M + idx * (photoW + gap);
         doc.setFont("helvetica", "bold").setFontSize(8).setTextColor(50);
@@ -146,8 +149,13 @@ export async function generatePdfDoc(r: WorkReport, number: string | number, cre
         } catch (imgErr) {
           console.error("Error adding photo to PDF", imgErr);
         }
+        if (f.descripcion?.trim()) {
+          doc.setFont("helvetica", "normal").setFontSize(7.5).setTextColor(60);
+          const descLines = doc.splitTextToSize(f.descripcion.trim(), photoW);
+          doc.text(descLines, x, y + photoH + 9);
+        }
       });
-      y += photoH + 10;
+      y += photoH + 11 + extraH;
     }
     y += 2;
   }

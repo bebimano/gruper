@@ -1,7 +1,8 @@
 import { useRef, useState } from "react";
-import { Camera, Image as ImageIcon, Trash2, Eye, Plus, Loader2 } from "lucide-react";
+import { Camera, Trash2, Eye, Plus, Loader2, Sparkles, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { ReportPhoto } from "@/lib/work-report";
@@ -16,53 +17,42 @@ interface ReportPhotosProps {
 export function ReportPhotos({ fotos = [], onChange, disabled = false }: ReportPhotosProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewTitle, setPreviewTitle] = useState<string>("");
-  const [processingSlot, setProcessingSlot] = useState<string | null>(null);
+  const [processing, setProcessing] = useState<boolean>(false);
 
-  const antesInputRef = useRef<HTMLInputElement>(null);
-  const despuesInputRef = useRef<HTMLInputElement>(null);
-  const extraInputRef = useRef<HTMLInputElement>(null);
+  const inputAntesRef = useRef<HTMLInputElement>(null);
+  const inputDespuesRef = useRef<HTMLInputElement>(null);
+  const inputGeneralRef = useRef<HTMLInputElement>(null);
 
-  const fotoAntes = fotos.find((f) => f.tipo === "antes");
-  const fotoDespues = fotos.find((f) => f.tipo === "despues");
-  const fotosExtra = fotos.filter((f) => f.tipo !== "antes" && f.tipo !== "despues");
-
-  const handleFile = async (file: File, tipo: "antes" | "despues" | "otro", titulo?: string) => {
+  const handleFile = async (file: File, tipo: "antes" | "despues" | "otro") => {
     if (!file.type.startsWith("image/")) {
-      toast.error("Por favor, selecciona un archivo de imagen válido");
+      toast.error("Por favor, selecciona una imagen válida");
       return;
     }
 
-    const slotKey = `${tipo}-${titulo || ""}`;
-    setProcessingSlot(slotKey);
+    setProcessing(true);
     try {
       const dataUrl = await compressImage(file, 1200, 1200, 0.75);
       const newPhoto: ReportPhoto = {
-        id: `${tipo}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        id: `foto-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         tipo,
-        titulo: titulo || (tipo === "antes" ? "Antes (Avería)" : tipo === "despues" ? "Después (Reparado)" : "Detalle"),
+        titulo: tipo === "antes" ? "Antes (Avería)" : tipo === "despues" ? "Después (Reparado)" : "Foto de trabajo",
+        descripcion: "",
         url: dataUrl,
       };
 
-      if (tipo === "antes") {
-        onChange([...fotos.filter((f) => f.tipo !== "antes"), newPhoto]);
-      } else if (tipo === "despues") {
-        onChange([...fotos.filter((f) => f.tipo !== "despues"), newPhoto]);
-      } else {
-        onChange([...fotos, newPhoto]);
-      }
-
+      onChange([...fotos, newPhoto]);
       toast.success(
         tipo === "antes"
-          ? "Foto de la avería adjuntada"
+          ? "Foto de antes (avería) añadida"
           : tipo === "despues"
-          ? "Foto de la reparación adjuntada"
-          : "Foto adicional adjuntada"
+          ? "Foto de después (reparación) añadida"
+          : "Foto añadida"
       );
     } catch (err) {
       console.error(err);
       toast.error("No se pudo procesar la foto");
     } finally {
-      setProcessingSlot(null);
+      setProcessing(false);
     }
   };
 
@@ -71,254 +61,239 @@ export function ReportPhotos({ fotos = [], onChange, disabled = false }: ReportP
     toast.info("Foto eliminada");
   };
 
+  const updatePhotoDesc = (id: string, desc: string) => {
+    onChange(fotos.map((f) => (f.id === id ? { ...f, descripcion: desc } : f)));
+  };
+
+  const toggleTipo = (id: string) => {
+    onChange(
+      fotos.map((f) => {
+        if (f.id !== id) return f;
+        const nextTipo = f.tipo === "antes" ? "despues" : "antes";
+        return {
+          ...f,
+          tipo: nextTipo,
+          titulo: nextTipo === "antes" ? "Antes (Avería)" : "Después (Reparado)",
+        };
+      })
+    );
+  };
+
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2">
-        {/* FOTO ANTES (AVERÍA) */}
-        <div className="flex flex-col rounded-xl border border-border/80 bg-muted/40 p-3 transition-colors hover:border-primary/40">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-foreground flex items-center gap-1.5">
-              <Camera className="h-3.5 w-3.5 text-primary" /> Foto Antes (Avería)
-            </span>
-            {fotoAntes && <Badge variant="secondary" className="text-[10px] uppercase">Avería</Badge>}
-          </div>
+      {/* BOTONES DE ACCIÓN PARA AÑADIR FOTOS */}
+      {!disabled && (
+        <div className="flex flex-wrap gap-2.5 print:hidden">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={processing}
+            className="flex-1 sm:flex-none border-primary/40 bg-primary/5 hover:bg-primary/10 text-primary font-medium"
+            onClick={() => inputAntesRef.current?.click()}
+          >
+            <Camera className="h-4 w-4 mr-1.5" />
+            + Foto Antes (Avería)
+          </Button>
 
-          {fotoAntes ? (
-            <div className="relative group overflow-hidden rounded-lg border border-border bg-black/5 aspect-[4/3] flex items-center justify-center">
-              <img
-                src={fotoAntes.url}
-                alt="Foto avería antes"
-                className="w-full h-full object-cover cursor-pointer transition-transform group-hover:scale-102"
-                onClick={() => {
-                  setPreviewTitle("Foto Antes — Avería / Estado inicial");
-                  setPreviewUrl(fotoAntes.url);
-                }}
-              />
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  className="h-8 text-xs font-medium"
-                  onClick={() => {
-                    setPreviewTitle("Foto Antes — Avería / Estado inicial");
-                    setPreviewUrl(fotoAntes.url);
-                  }}
-                >
-                  <Eye className="h-3.5 w-3.5 mr-1" /> Ver grande
-                </Button>
-                {!disabled && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="destructive"
-                    className="h-8 text-xs"
-                    onClick={() => removePhoto(fotoAntes.id)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                )}
-              </div>
-            </div>
-          ) : (
-            <label
-              className={`flex-1 min-h-[140px] flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border p-4 text-center transition-colors ${
-                disabled
-                  ? "opacity-50 cursor-not-allowed"
-                  : "cursor-pointer hover:border-primary/60 hover:bg-primary/5"
-              }`}
-            >
-              {processingSlot === "antes-" ? (
-                <div className="flex flex-col items-center gap-2 text-primary">
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                  <span className="text-xs">Optimizando foto...</span>
-                </div>
-              ) : (
-                <>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary mb-2">
-                    <Camera className="h-5 w-5" />
-                  </div>
-                  <span className="text-xs font-medium text-foreground">Hacer foto de la avería</span>
-                  <span className="text-[11px] text-muted-foreground mt-0.5">Toca para abrir cámara o galería</span>
-                  <input
-                    ref={antesInputRef}
-                    type="file"
-                    accept="image/*"
-                    disabled={disabled}
-                    className="sr-only"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleFile(file, "antes");
-                      e.target.value = "";
-                    }}
-                  />
-                </>
-              )}
-            </label>
-          )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={processing}
+            className="flex-1 sm:flex-none border-emerald-500/40 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium"
+            onClick={() => inputDespuesRef.current?.click()}
+          >
+            <Camera className="h-4 w-4 mr-1.5" />
+            + Foto Después (Reparado)
+          </Button>
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={processing}
+            className="text-xs text-muted-foreground hover:text-foreground"
+            onClick={() => inputGeneralRef.current?.click()}
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            + Otra foto
+          </Button>
+
+          {/* Inputs ocultos para cámara o selector */}
+          <input
+            ref={inputAntesRef}
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleFile(file, "antes");
+              e.target.value = "";
+            }}
+          />
+          <input
+            ref={inputDespuesRef}
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleFile(file, "despues");
+              e.target.value = "";
+            }}
+          />
+          <input
+            ref={inputGeneralRef}
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleFile(file, "otro");
+              e.target.value = "";
+            }}
+          />
         </div>
+      )}
 
-        {/* FOTO DESPUÉS (REPARADO) */}
-        <div className="flex flex-col rounded-xl border border-border/80 bg-muted/40 p-3 transition-colors hover:border-primary/40">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-foreground flex items-center gap-1.5">
-              <Camera className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> Foto Después (Reparado)
-            </span>
-            {fotoDespues && (
-              <Badge variant="outline" className="text-[10px] uppercase border-emerald-500/40 text-emerald-600 dark:text-emerald-400">
-                Reparado
-              </Badge>
-            )}
-          </div>
-
-          {fotoDespues ? (
-            <div className="relative group overflow-hidden rounded-lg border border-border bg-black/5 aspect-[4/3] flex items-center justify-center">
-              <img
-                src={fotoDespues.url}
-                alt="Foto reparación después"
-                className="w-full h-full object-cover cursor-pointer transition-transform group-hover:scale-102"
-                onClick={() => {
-                  setPreviewTitle("Foto Después — Reparación finalizada");
-                  setPreviewUrl(fotoDespues.url);
-                }}
-              />
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  className="h-8 text-xs font-medium"
-                  onClick={() => {
-                    setPreviewTitle("Foto Después — Reparación finalizada");
-                    setPreviewUrl(fotoDespues.url);
-                  }}
-                >
-                  <Eye className="h-3.5 w-3.5 mr-1" /> Ver grande
-                </Button>
-                {!disabled && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="destructive"
-                    className="h-8 text-xs"
-                    onClick={() => removePhoto(fotoDespues.id)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                )}
-              </div>
-            </div>
-          ) : (
-            <label
-              className={`flex-1 min-h-[140px] flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border p-4 text-center transition-colors ${
-                disabled
-                  ? "opacity-50 cursor-not-allowed"
-                  : "cursor-pointer hover:border-emerald-500/60 hover:bg-emerald-500/5"
-              }`}
-            >
-              {processingSlot === "despues-" ? (
-                <div className="flex flex-col items-center gap-2 text-emerald-600">
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                  <span className="text-xs">Optimizando foto...</span>
-                </div>
-              ) : (
-                <>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 mb-2">
-                    <Camera className="h-5 w-5" />
-                  </div>
-                  <span className="text-xs font-medium text-foreground">Hacer foto del trabajo terminado</span>
-                  <span className="text-[11px] text-muted-foreground mt-0.5">Toca para abrir cámara o galería</span>
-                  <input
-                    ref={despuesInputRef}
-                    type="file"
-                    accept="image/*"
-                    disabled={disabled}
-                    className="sr-only"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleFile(file, "despues");
-                      e.target.value = "";
-                    }}
-                  />
-                </>
-              )}
-            </label>
-          )}
+      {/* INDICADOR DE PROCESAMIENTO */}
+      {processing && (
+        <div className="flex items-center gap-2 rounded-lg bg-primary/10 px-3 py-2 text-xs text-primary">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span>Optimizando fotografía para el parte...</span>
         </div>
-      </div>
+      )}
 
-      {/* FOTOS ADICIONALES (SI LAS HAY) */}
-      {fotosExtra.length > 0 && (
-        <div className="space-y-2 pt-2">
-          <p className="text-xs font-medium text-muted-foreground">Otras fotos adjuntas:</p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            {fotosExtra.map((f) => (
-              <div key={f.id} className="relative group rounded-lg overflow-hidden border border-border aspect-[4/3] bg-muted/40">
-                <img
-                  src={f.url}
-                  alt={f.titulo || "Foto adjunta"}
-                  className="w-full h-full object-cover cursor-pointer"
-                  onClick={() => {
-                    setPreviewTitle(f.titulo || "Foto de trabajo");
-                    setPreviewUrl(f.url);
-                  }}
-                />
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 p-1">
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="secondary"
-                    className="h-7 w-7"
-                    onClick={() => {
-                      setPreviewTitle(f.titulo || "Foto de trabajo");
-                      setPreviewUrl(f.url);
-                    }}
-                  >
-                    <Eye className="h-3.5 w-3.5" />
-                  </Button>
-                  {!disabled && (
+      {/* LISTA DE FOTOS */}
+      {fotos.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border p-6 text-center text-muted-foreground bg-muted/20">
+          <Camera className="h-8 w-8 mx-auto text-muted-foreground/60 mb-2" />
+          <p className="text-sm font-medium text-foreground">No hay fotos en este parte</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Pulsa en <strong>+ Foto Antes</strong> o <strong>+ Foto Después</strong> para hacer fotos con la cámara o subirlas.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          {fotos.map((f, index) => {
+            const isAntes = f.tipo === "antes";
+            const isDespues = f.tipo === "despues";
+
+            return (
+              <div
+                key={f.id}
+                className="flex flex-col rounded-xl border border-border bg-card p-3 shadow-sm space-y-2.5 transition-colors hover:border-primary/40"
+              >
+                {/* CABECERA DE LA FOTO: TIPO + BOTÓN ELIMINAR */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-semibold text-muted-foreground">#{index + 1}</span>
+                    <button
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => toggleTipo(f.id)}
+                      title="Pulsa para cambiar entre Antes y Después"
+                      className="cursor-pointer"
+                    >
+                      <Badge
+                        variant={isAntes ? "secondary" : isDespues ? "outline" : "secondary"}
+                        className={`text-[11px] font-semibold uppercase tracking-wide cursor-pointer transition-colors ${
+                          isAntes
+                            ? "bg-primary/15 text-primary border-primary/30 hover:bg-primary/25"
+                            : isDespues
+                            ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25"
+                            : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {isAntes ? "Antes (Avería)" : isDespues ? "Después (Reparado)" : "Foto de trabajo"}
+                        {!disabled && <span className="ml-1 opacity-60 text-[9px]">⇄</span>}
+                      </Badge>
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-1">
                     <Button
                       type="button"
                       size="icon"
-                      variant="destructive"
-                      className="h-7 w-7"
-                      onClick={() => removePhoto(f.id)}
+                      variant="ghost"
+                      className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                      onClick={() => {
+                        setPreviewTitle(
+                          isAntes
+                            ? "Foto Antes — Avería / Estado inicial"
+                            : isDespues
+                            ? "Foto Después — Reparación finalizada"
+                            : "Fotografía de trabajo"
+                        );
+                        setPreviewUrl(f.url);
+                      }}
+                      title="Ver en grande"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Eye className="h-4 w-4" />
                     </Button>
-                  )}
+
+                    {!disabled && (
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        onClick={() => removePhoto(f.id)}
+                        title="Eliminar foto"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* IMAGEN DE LA FOTO */}
+                <div
+                  className="relative group overflow-hidden rounded-lg border border-border bg-black/5 aspect-[4/3] flex items-center justify-center cursor-pointer"
+                  onClick={() => {
+                    setPreviewTitle(
+                      isAntes
+                        ? "Foto Antes — Avería / Estado inicial"
+                        : isDespues
+                        ? "Foto Después — Reparación finalizada"
+                        : "Fotografía de trabajo"
+                    );
+                    setPreviewUrl(f.url);
+                  }}
+                >
+                  <img
+                    src={f.url}
+                    alt={f.descripcion || f.titulo || "Foto de trabajo"}
+                    className="w-full h-full object-cover transition-transform group-hover:scale-102"
+                  />
+                  <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <span className="rounded-full bg-black/70 px-3 py-1 text-xs text-white flex items-center gap-1">
+                      <Eye className="h-3.5 w-3.5" /> Ampliar
+                    </span>
+                  </div>
+                </div>
+
+                {/* DESCRIPCIÓN DE LA FOTO */}
+                <div>
+                  <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                    Descripción de la foto:
+                  </label>
+                  <Input
+                    placeholder="Ej. Rotura en latiguillo, pieza sustituida..."
+                    value={f.descripcion || ""}
+                    disabled={disabled}
+                    onChange={(e) => updatePhotoDesc(f.id, e.target.value)}
+                    className="text-xs h-8"
+                  />
                 </div>
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
       )}
 
-      {/* BOTÓN PARA AÑADIR MÁS FOTOS */}
-      {!disabled && (
-        <div className="flex items-center justify-between pt-1 print:hidden">
-          <p className="text-[11px] text-muted-foreground">
-            Las fotos se comprimen y se adjuntarán automáticamente en el PDF del parte.
-          </p>
-          <label className="inline-flex items-center gap-1.5 cursor-pointer rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors">
-            <Plus className="h-3.5 w-3.5 text-primary" />
-            <span>Añadir otra foto</span>
-            <input
-              ref={extraInputRef}
-              type="file"
-              accept="image/*"
-              className="sr-only"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleFile(file, "otro", `Detalle ${fotosExtra.length + 1}`);
-                e.target.value = "";
-              }}
-            />
-          </label>
-        </div>
-      )}
-
-      {/* MODAL / DIALOG DE VISTA PREVIA EN TAMAÑO COMPLETO */}
+      {/* DIALOG DE VISTA PREVIA EN GRANDE */}
       <Dialog open={!!previewUrl} onOpenChange={(open) => !open && setPreviewUrl(null)}>
         <DialogContent className="max-w-2xl p-4 sm:p-6">
           <DialogHeader>
