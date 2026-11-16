@@ -78,13 +78,13 @@ function Admin() {
   if (me.isLoading) return null;
   if (!me.data?.isAdmin) return <p className="p-8 text-center text-muted-foreground">No autorizado</p>;
   return (
-    <main className="min-h-screen bg-hero px-5 safe-top safe-bottom max-w-2xl mx-auto">
+    <main className="min-h-screen bg-hero px-4 sm:px-6 md:px-8 safe-top safe-bottom max-w-5xl w-full mx-auto pb-12">
       <header className="py-3">
         <div className="flex items-center justify-between">
-          <img src={logo.url} alt="Gruper" width={1076} height={343} className="h-8 w-auto" />
+          <img src={logo.url} alt="Gruper" width={1076} height={343} className="h-8 sm:h-9 w-auto" />
           <Link to="/maquinas" className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-sm text-muted-foreground hover:text-primary"><ArrowLeft className="h-4 w-4" /> Máquinas</Link>
         </div>
-        <h1 className="mt-4 text-2xl font-bold">Administración</h1>
+        <h1 className="mt-4 text-2xl sm:text-3xl font-bold">Administración</h1>
       </header>
       <Tabs defaultValue="machines" className="mt-2">
         <TabsList className="w-full h-auto flex-wrap">

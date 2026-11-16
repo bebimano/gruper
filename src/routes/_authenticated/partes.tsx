@@ -50,36 +50,36 @@ function Partes() {
   if (!me.data?.canReports) return <p className="p-8 text-center text-muted-foreground">No tienes acceso a partes de trabajo.</p>;
 
   return (
-    <main className="min-h-screen px-5 safe-top safe-bottom max-w-2xl mx-auto">
+    <main className="min-h-screen px-4 sm:px-6 md:px-8 safe-top safe-bottom max-w-5xl w-full mx-auto pb-12">
       <header className="flex items-center justify-between py-3">
         <Link to="/maquinas" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Volver</Link>
         <Button asChild size="sm"><Link to="/parte/$id" params={{ id: "nuevo" }}><Plus /> Nuevo parte</Link></Button>
       </header>
-      <h1 className="mt-4 text-2xl font-bold">Partes de trabajo</h1>
+      <h1 className="mt-4 text-2xl sm:text-3xl font-bold">Partes de trabajo</h1>
       {reports.data?.length === 0 && <p className="mt-6 rounded-xl border border-border p-6 text-center text-sm text-muted-foreground">Aún no hay partes. Crea el primero.</p>}
       {groups.map((g) => (
       <section key={g.userId} className="mt-6">
         <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           <User className="h-4 w-4 text-primary" /> {g.name} <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium normal-case">{g.items.length}</span>
         </h2>
-      <div className="divide-y divide-border rounded-xl border border-border bg-background">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
         {g.items.map((r) => {
           const d = normalizeReport(r.data);
           // Show per-user number (Nº personal), falls back to global number
           const displayNum = r.user_number ?? r.number;
           return (
-            <Link key={r.id} to="/parte/$id" params={{ id: r.id }} className="flex items-center gap-3 p-4 hover:bg-muted transition-colors">
+            <Link key={r.id} to="/parte/$id" params={{ id: r.id }} className="flex items-center gap-3 p-3.5 rounded-xl border border-border bg-card shadow-sm hover:border-primary/50 hover:bg-muted/50 transition-colors">
               <FileText className="h-5 w-5 shrink-0 text-primary" />
               <span className="flex-1 min-w-0">
-                <span className="block font-medium truncate">
+                <span className="block font-semibold truncate text-foreground">
                   Parte Nº {displayNum} · {d.cliente || "Sin cliente"}
                 </span>
-                <span className="block text-xs text-muted-foreground">
+                <span className="block text-xs text-muted-foreground mt-0.5 truncate">
                   {new Date(r.created_at).toLocaleDateString("es-ES")}
                   {" · "}
                   <span className="font-medium text-foreground/70">{g.name}</span>
                   {d.tecnico && d.tecnico !== g.name && ` · Técnico: ${d.tecnico}`}
-                  {r.closed && <span className="ml-1.5 inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium">Cerrado</span>}
+                  {r.closed && <span className="ml-1.5 inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium border border-border">Cerrado</span>}
                 </span>
               </span>
               <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />

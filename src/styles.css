@@ -63,8 +63,18 @@
 
 @layer base {
   * { border-color: var(--color-border); }
-  html, body { background-color: var(--color-background); color: var(--color-foreground); font-family: var(--font-sans); }
-  body { -webkit-tap-highlight-color: transparent; }
+  html, body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    min-height: 100%;
+    width: 100%;
+    overflow-x: hidden;
+  }
+  body {
+    -webkit-tap-highlight-color: transparent;
+    text-rendering: optimizeLegibility;
+  }
 }
 
 @utility bg-hero { background-image: var(--gradient-hero); }

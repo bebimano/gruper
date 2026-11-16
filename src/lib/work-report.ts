@@ -5,6 +5,13 @@ export type Dia = {
 };
 export type Linea = { codigo: string; descripcion: string; cantidad: string };
 
+export type ReportPhoto = {
+  id: string;
+  tipo: "antes" | "despues" | "otro";
+  titulo?: string;
+  url: string;
+};
+
 export type WorkReport = {
   cliente: string; direccion: string; de: string; tecnico: string; vehiculo: string;
   codigoMaquina: string; numSerie: string; reparacion: string; suministro: string;
@@ -12,6 +19,7 @@ export type WorkReport = {
   dias: Dia[]; trabajos: Linea[]; materialesLista: Linea[];
   solicitadoPor: string; observaciones: string;
   firmaNombre: string; firma: string;
+  fotos: ReportPhoto[];
 };
 
 export const emptyDia = (): Dia => ({ fecha: "", idaDe: "", idaA: "", kmIda: "", mananaDe: "", mananaA: "", tardeDe: "", tardeA: "", vueltaDe: "", vueltaA: "", kmVuelta: "" });
@@ -23,6 +31,7 @@ export function emptyReport(tecnico = ""): WorkReport {
     reparacion: "", suministro: "", materiales: "", instalacion: "",
     dias: [emptyDia()], trabajos: [emptyLinea()], materialesLista: [emptyLinea()],
     solicitadoPor: "", observaciones: "", firmaNombre: "", firma: "",
+    fotos: [],
   };
 }
 
@@ -36,5 +45,6 @@ export function normalizeReport(d: unknown): WorkReport {
     dias: o.dias?.length ? o.dias : base.dias,
     trabajos: o.trabajos?.length ? o.trabajos : base.trabajos,
     materialesLista: o.materialesLista?.length ? o.materialesLista : base.materialesLista,
+    fotos: Array.isArray(o.fotos) ? o.fotos : [],
   };
 }

@@ -73,28 +73,32 @@ function Trabajos() {
   const name = (id: string | null) => users.data?.find((u) => u.id === id)?.username ?? (id ? "Usuario" : "Sin asignar");
 
   return (
-    <main className="min-h-screen px-5 safe-top safe-bottom max-w-2xl mx-auto pb-10">
+    <main className="min-h-screen px-4 sm:px-6 md:px-8 safe-top safe-bottom max-w-5xl w-full mx-auto pb-12">
       <header className="py-3">
         <Link to="/maquinas" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Volver</Link>
       </header>
-      <h1 className="mt-4 text-2xl font-bold">Trabajos</h1>
+      <h1 className="mt-4 text-2xl sm:text-3xl font-bold">Trabajos</h1>
 
       {isAdmin && (
-        <form onSubmit={create} className="mt-5 rounded-xl border border-border bg-background p-4 space-y-3">
-          <h2 className="font-medium">Nuevo trabajo</h2>
-          <Input placeholder="Título del trabajo" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
-          <Input placeholder="Cliente" value={form.client} onChange={(e) => setForm({ ...form, client: e.target.value })} />
+        <form onSubmit={create} className="mt-5 rounded-xl border border-border bg-card p-4 sm:p-5 space-y-3.5 shadow-sm">
+          <h2 className="font-semibold text-foreground text-sm uppercase tracking-wide">Crear nuevo trabajo</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input placeholder="Título del trabajo" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
+            <Input placeholder="Cliente" value={form.client} onChange={(e) => setForm({ ...form, client: e.target.value })} />
+          </div>
           <Textarea placeholder="Descripción" rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-          <select className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm" value={form.assigned_to} onChange={(e) => setForm({ ...form, assigned_to: e.target.value })}>
-            <option value="">Asignar a…</option>
-            {users.data?.map((u) => <option key={u.id} value={u.id}>{u.username}</option>)}
-          </select>
-          <Button type="submit"><Plus /> Crear trabajo</Button>
+          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+            <select className="h-10 flex-1 rounded-lg border border-input bg-background px-3 text-sm" value={form.assigned_to} onChange={(e) => setForm({ ...form, assigned_to: e.target.value })}>
+              <option value="">Asignar a…</option>
+              {users.data?.map((u) => <option key={u.id} value={u.id}>{u.username}</option>)}
+            </select>
+            <Button type="submit"><Plus /> Crear trabajo</Button>
+          </div>
         </form>
       )}
 
       {jobs.data?.length === 0 && <p className="mt-6 rounded-xl border border-border p-6 text-center text-sm text-muted-foreground">No hay trabajos.</p>}
-      <div className="mt-6 space-y-3">
+      <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-3.5">
         {jobs.data?.map((j) => <JobCard key={j.id} j={j} admin={isAdmin} who={name(j.assigned_to)} onStatus={setStatus} onDelete={remove} />)}
       </div>
     </main>

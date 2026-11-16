@@ -42,9 +42,9 @@ function Machines() {
   }
 
   return (
-    <main className="min-h-screen bg-hero px-5 safe-top safe-bottom flex flex-col max-w-2xl mx-auto">
+    <main className="min-h-screen bg-hero px-4 sm:px-6 md:px-8 safe-top safe-bottom flex flex-col max-w-5xl w-full mx-auto pb-10">
       <header className="flex items-center justify-between py-3">
-        <img src={logo.url} alt="Gruper" width={1076} height={343} className="h-10 w-auto" />
+        <img src={logo.url} alt="Gruper" width={1076} height={343} className="h-9 sm:h-11 w-auto" />
         <div className="flex gap-1">
           {me.data?.isAdmin && (
             <Button variant="ghost" size="icon" asChild aria-label="Administración">
@@ -54,38 +54,47 @@ function Machines() {
           <Button variant="ghost" size="icon" onClick={logout} aria-label="Cerrar sesión"><LogOut /></Button>
         </div>
       </header>
-      <h1 className="mt-6 text-2xl font-bold">Hola{me.data?.username ? `, ${me.data.username}` : ""}</h1>
-      <p className="text-muted-foreground">Selecciona una máquina</p>
-      {me.data?.canReports && (
-        <Link to="/partes" className="mt-5 flex items-center gap-3 rounded-xl border border-border bg-background px-4 py-3 hover:bg-muted transition-colors">
-          <FileText className="h-5 w-5 text-primary" />
-          <span className="flex-1 font-medium">Partes de trabajo</span>
+      <div className="mt-4 sm:mt-6">
+        <h1 className="text-2xl sm:text-3xl font-bold">Hola{me.data?.username ? `, ${me.data.username}` : ""}</h1>
+        <p className="text-muted-foreground text-sm sm:text-base">Selecciona una máquina o gestiona tus trabajos</p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-5">
+        {me.data?.canReports && (
+          <Link to="/partes" className="flex items-center gap-3 rounded-xl border border-border bg-background px-4 py-3 hover:bg-muted transition-colors shadow-sm">
+            <FileText className="h-5 w-5 text-primary shrink-0" />
+            <span className="flex-1 font-medium">Partes de trabajo</span>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </Link>
+        )}
+        <Link to="/trabajos" className="flex items-center gap-3 rounded-xl border border-border bg-background px-4 py-3 hover:bg-muted transition-colors shadow-sm">
+          <Wrench className="h-5 w-5 text-primary shrink-0" />
+          <span className="flex-1 font-medium">Trabajos</span>
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </Link>
-      )}
-      <Link to="/trabajos" className="mt-3 flex items-center gap-3 rounded-xl border border-border bg-background px-4 py-3 hover:bg-muted transition-colors">
-        <Wrench className="h-5 w-5 text-primary" />
-        <span className="flex-1 font-medium">Trabajos</span>
-        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-      </Link>
-      <div className="mt-6 space-y-3 flex-1">
-        {machines.isLoading && <p className="text-muted-foreground">Cargando…</p>}
+      </div>
+
+      <div className="mt-8 flex-1">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Máquinas disponibles</h2>
+        {machines.isLoading && <p className="text-muted-foreground text-sm">Cargando máquinas…</p>}
         {machines.data?.length === 0 && (
           <p className="rounded-2xl border border-border bg-card p-6 text-center text-muted-foreground">No tienes máquinas asignadas todavía.</p>
         )}
-        {machines.data?.map((m) => (
-          <Link key={m.id} to="/maquina/$id" params={{ id: m.id }}
-            className="flex items-center gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm active:scale-[0.98] transition hover:border-primary hover:shadow-glow">
-            <span className="grid h-12 w-12 place-items-center rounded-xl bg-primary/15 text-primary"><Monitor /></span>
-            <span className="flex-1">
-              <span className="block font-medium">{m.name}</span>
-              {m.description && <span className="block text-sm text-muted-foreground">{m.description}</span>}
-            </span>
-            <ChevronRight className="text-muted-foreground" />
-          </Link>
-        ))}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+          {machines.data?.map((m) => (
+            <Link key={m.id} to="/maquina/$id" params={{ id: m.id }}
+              className="flex items-center gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm active:scale-[0.98] transition hover:border-primary hover:shadow-glow">
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-primary/15 text-primary"><Monitor /></span>
+              <span className="flex-1 min-w-0">
+                <span className="block font-semibold truncate text-foreground">{m.name}</span>
+                {m.description && <span className="block text-xs text-muted-foreground line-clamp-2 mt-0.5">{m.description}</span>}
+              </span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </Link>
+          ))}
+        </div>
       </div>
-      <footer className="flex flex-col items-center gap-3 py-8"><AboutLink /><ContactLink /></footer>
+      <footer className="flex flex-col items-center gap-3 pt-8 pb-4"><AboutLink /><ContactLink /></footer>
     </main>
   );
 }

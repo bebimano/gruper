@@ -19,6 +19,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { buildReportPdf, downloadReportPdf, getReportFilename } from "@/lib/report-pdf";
 import { sendReportEmail } from "@/lib/report-email.functions";
 import { notifyEvent } from "@/lib/notify.functions";
+import { ReportPhotos } from "@/components/ReportPhotos";
 
 export const Route = createFileRoute("/_authenticated/parte/$id")({
   head: () => ({
@@ -267,7 +268,7 @@ function Parte() {
   );
 
   return (
-    <main className="min-h-screen px-5 safe-top pb-28 max-w-3xl mx-auto">
+    <main className="min-h-screen px-4 sm:px-6 md:px-8 safe-top pb-32 max-w-4xl lg:max-w-5xl w-full mx-auto">
       <header className="flex items-center justify-between py-3 print:hidden">
         <Link to="/partes" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Partes</Link>
         <div className="flex gap-1">
@@ -403,6 +404,14 @@ function Parte() {
         <Section title="Trabajo realizado">{lines("trabajos", "Código (ej. MONTAJES)")}</Section>
         <Section title="Material utilizado">{lines("materialesLista", "Referencia")}</Section>
 
+        <Section title="Fotografías de la avería y reparación">
+          <ReportPhotos
+            fotos={r.fotos ?? []}
+            onChange={(fotos) => set("fotos", fotos)}
+            disabled={locked}
+          />
+        </Section>
+
         <Section title="Cierre">
           <Field label="Solicitado por" {...f("solicitadoPor")} />
           <label className="block">
@@ -418,8 +427,8 @@ function Parte() {
       </div>
       </fieldset>
 
-      <div className="fixed inset-x-0 bottom-0 border-t border-border bg-background/95 backdrop-blur px-5 py-3 safe-bottom print:hidden">
-        <div className="mx-auto max-w-3xl">
+      <div className="fixed inset-x-0 bottom-0 border-t border-border bg-background/95 backdrop-blur px-4 sm:px-6 md:px-8 py-3 safe-bottom print:hidden">
+        <div className="mx-auto max-w-4xl lg:max-w-5xl">
           {closed ? (
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={sendEmail} disabled={sending}>

@@ -127,6 +127,31 @@ export async function generatePdfDoc(r: WorkReport, number: string | number, cre
   }
   y += 3;
 
+  const validFotos = (r.fotos || []).filter((f) => f.url);
+  if (validFotos.length > 0) {
+    title("Fotografías del trabajo (Antes / Después)");
+    const gap = 6;
+    const photoW = (W - 2 * M - gap) / 2;
+    const photoH = 55;
+    for (let i = 0; i < validFotos.length; i += 2) {
+      need(photoH + 14);
+      const batch = validFotos.slice(i, i + 2);
+      batch.forEach((f, idx) => {
+        const x = M + idx * (photoW + gap);
+        doc.setFont("helvetica", "bold").setFontSize(8).setTextColor(50);
+        const label = f.tipo === "antes" ? "ANTES (Avería / Estado inicial)" : f.tipo === "despues" ? "DESPUÉS (Reparación / Estado final)" : (f.titulo || "Foto de trabajo");
+        doc.text(label, x, y + 3);
+        try {
+          doc.addImage(f.url, "JPEG", x, y + 5, photoW, photoH);
+        } catch (imgErr) {
+          console.error("Error adding photo to PDF", imgErr);
+        }
+      });
+      y += photoH + 10;
+    }
+    y += 2;
+  }
+
   title("Cierre");
   pairs([["Solicitado por", r.solicitadoPor], ["", ""]]);
   const obs = doc.splitTextToSize(`Observaciones: ${r.observaciones || "—"}`, W - 2 * M);
