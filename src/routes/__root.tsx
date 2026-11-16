@@ -16,6 +16,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
 import { NewReportNotifier } from "@/components/NewReportNotifier";
 import { PushRegistrar } from "@/components/PushRegistrar";
+import { JobNotifier } from "@/components/JobNotifier";
+import { IosInstallPrompt } from "@/components/IosInstallPrompt";
 
 function NotFoundComponent() {
   return (
@@ -82,17 +84,22 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { name: "theme-color", content: "#ffffff" },
+      { name: "theme-color", content: "#259FFD" },
       { title: "Gruper Remote" },
       { name: "description", content: "Acceso remoto a las máquinas Gruper." },
       { property: "og:title", content: "Gruper Remote" },
       { property: "og:description", content: "Acceso remoto a las máquinas Gruper." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "default" },
+      { name: "apple-mobile-web-app-title", content: "Gruper Remote" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
+      { rel: "manifest", href: "/manifest.json" },
       { rel: "icon", type: "image/png", href: "/favicon.png" },
+      { rel: "apple-touch-icon", href: "/favicon.png" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap" },
     ],
@@ -136,7 +143,9 @@ function RootComponent() {
       <Outlet />
       <Toaster position="top-center" />
       <NewReportNotifier />
+      <JobNotifier />
       <PushRegistrar />
+      <IosInstallPrompt />
     </QueryClientProvider>
   );
 }

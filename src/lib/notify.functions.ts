@@ -28,6 +28,9 @@ export const notifyEvent = createServerFn({ method: "POST" })
         if (j.assigned_to) extra = [j.assigned_to];
       } else {
         title = `Trabajo: ${STATUS[j.status] ?? j.status}`; body = `${j.title}${j.status_note ? ` — ${j.status_note}` : ""}`;
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { data: adminRoles } = await supabaseAdmin.from("user_roles").select("user_id").eq("role", "admin");
+        extra = (adminRoles ?? []).map((a) => a.user_id);
       }
     }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
