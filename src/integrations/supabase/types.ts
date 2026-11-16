@@ -264,6 +264,39 @@ export type Database = {
         }
         Relationships: []
       }
+      client_equipment: {
+        Row: {
+          id: string
+          client_name: string
+          direccion: string
+          poblacion: string
+          tipo_maquina: string
+          modelo: string
+          num_serie: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          client_name: string
+          direccion?: string
+          poblacion?: string
+          tipo_maquina?: string
+          modelo?: string
+          num_serie?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          client_name?: string
+          direccion?: string
+          poblacion?: string
+          tipo_maquina?: string
+          modelo?: string
+          num_serie?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       report_contacts: {
         Row: {
           created_at: string

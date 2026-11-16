@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Plus, Printer, Trash2, X } from "lucide-react";
+import { ArrowLeft, Plus, Printer, Trash2, X, Cpu } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
@@ -14,6 +14,7 @@ import { SignaturePad } from "@/components/SignaturePad";
 import { MaterialPicker } from "@/components/MaterialPicker";
 import { useFixedEmails } from "@/components/FixedEmailsAdmin";
 import { useReportContacts } from "@/components/ReportContactsAdmin";
+import { useClientEquipment } from "@/components/ClientEquipmentAdmin";
 import { Mail } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { buildReportPdf } from "@/lib/report-pdf";
@@ -75,6 +76,11 @@ function Parte() {
   });
   const contacts = useReportContacts();
   const fixedEmails = useFixedEmails();
+  // Load all client equipment to filter by selected client
+  const allEquipment = useClientEquipment();
+  const clientEquipment = (allEquipment.data ?? []).filter(
+    (eq) => eq.client_name.trim().toLowerCase() === r?.cliente?.trim().toLowerCase(),
+  );
 
   useEffect(() => {
     if (isNew && me.data && !r) setR(emptyReport(me.data.username.toUpperCase()));
@@ -189,6 +195,38 @@ function Parte() {
             <Field label="Materiales" {...f("materiales")} />
             <Field label="Instalación" {...f("instalacion")} />
           </div>
+
+          {/* Machine quick-pick: shown when there are registered machines for the selected client */}
+          {clientEquipment.length > 0 && (
+            <div className="mt-3 rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-2 print:hidden">
+              <p className="text-xs font-semibold text-primary flex items-center gap-1.5">
+                <Cpu className="h-3.5 w-3.5" /> Máquinas de {r.cliente} — pulsa para rellenar código y nº serie:
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {clientEquipment.map((eq) => (
+                  <button
+                    key={eq.id}
+                    type="button"
+                    onClick={() => {
+                      set("codigoMaquina", eq.tipo_maquina);
+                      set("numSerie", eq.num_serie);
+                    }}
+                    className="rounded-lg border border-primary/30 bg-background px-3 py-1.5 text-left text-sm transition-colors hover:bg-primary/10 hover:border-primary"
+                  >
+                    <span className="font-medium">{eq.tipo_maquina}</span>
+                    {eq.modelo && <span className="ml-1.5 text-muted-foreground text-xs">{eq.modelo}</span>}
+                    <span className="ml-1.5 font-mono text-xs text-muted-foreground">· {eq.num_serie}</span>
+                  </button>
+                ))}
+              </div>
+              {/* Show address if available */}
+              {(clientEquipment[0]?.direccion || clientEquipment[0]?.poblacion) && (
+                <p className="text-xs text-muted-foreground">
+                  📍 {[clientEquipment[0].direccion, clientEquipment[0].poblacion].filter(Boolean).join(", ")}
+                </p>
+              )}
+            </div>
+          )}
         </Section>
 
         <Section title="Horas de trabajo">

@@ -20,6 +20,7 @@ import { MaterialsAdmin } from "@/components/MaterialsAdmin";
 import { ReportContactsAdmin } from "@/components/ReportContactsAdmin";
 import { FixedEmailsAdmin } from "@/components/FixedEmailsAdmin";
 import { NotificationSettingsAdmin } from "@/components/NotificationSettingsAdmin";
+import { ClientEquipmentAdmin } from "@/components/ClientEquipmentAdmin";
 
 function EditRequests() {
   const qc = useQueryClient();
@@ -89,6 +90,7 @@ function Admin() {
         <TabsList className="w-full h-auto flex-wrap">
           <TabsTrigger value="machines" className="flex-1">Máquinas</TabsTrigger>
           <TabsTrigger value="clients" className="flex-1">Usuarios</TabsTrigger>
+          <TabsTrigger value="equipment" className="flex-1">Equipos</TabsTrigger>
           <TabsTrigger value="opens" className="flex-1">Accesos</TabsTrigger>
           <TabsTrigger value="messages" className="flex-1">Mensajes</TabsTrigger>
           <TabsTrigger value="reports" className="flex-1">Partes</TabsTrigger>
@@ -97,6 +99,7 @@ function Admin() {
         </TabsList>
         <TabsContent value="machines"><MachinesAdmin /></TabsContent>
         <TabsContent value="clients"><ClientsAdmin myId={me.data.id} /></TabsContent>
+        <TabsContent value="equipment"><div className="mt-4"><ClientEquipmentAdmin /></div></TabsContent>
         <TabsContent value="opens"><OpensLog /></TabsContent>
         <TabsContent value="messages"><ContactMessages /></TabsContent>
         <TabsContent value="reports">
