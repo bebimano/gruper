@@ -12,9 +12,11 @@ export const notifyEvent = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     let title = "", body = "", link = "", extra: string[] = [];
     if (data.event === "new_report") {
-      const { data: r } = await context.supabase.from("work_reports").select("number, data").eq("id", data.id).maybeSingle();
+      const { data: r } = await context.supabase.from("work_reports").select("number, user_number, user_id, data").eq("id", data.id).maybeSingle();
       if (!r) return { sent: 0 };
-      title = `Nuevo parte Nº ${r.number}`;
+      const { data: p } = await context.supabase.from("profiles").select("username").eq("id", r.user_id).maybeSingle();
+      const num = r.user_number ?? r.number;
+      title = `Nuevo parte Nº ${num}${p?.username ? ` (${p.username})` : ""}`;
       body = String((r.data as { cliente?: string })?.cliente || "Sin cliente");
       link = `/parte/${data.id}`;
     } else {

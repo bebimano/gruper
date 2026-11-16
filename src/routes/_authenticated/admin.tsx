@@ -27,7 +27,7 @@ function EditRequests() {
   const q = useQuery({
     queryKey: ["edit-requests"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("work_reports").select("id, number, user_id, data").eq("edit_requested", true).order("number");
+      const { data, error } = await supabase.from("work_reports").select("id, number, user_number, user_id, data").eq("edit_requested", true).order("number");
       if (error) throw error;
       return data;
     },
@@ -47,7 +47,7 @@ function EditRequests() {
       {q.data.map((r) => (
         <div key={r.id} className="flex flex-wrap items-center gap-2 text-sm">
           <Link to="/parte/$id" params={{ id: r.id }} className="flex-1 font-medium hover:text-primary">
-            Parte Nº {r.number} — {String((r.data as { cliente?: string })?.cliente ?? "")}
+            Parte Nº {r.user_number ?? r.number} — {String((r.data as { cliente?: string })?.cliente ?? "")}
           </Link>
           <Button size="sm" onClick={() => decide(r.id, true)}>Permitir</Button>
           <Button size="sm" variant="outline" onClick={() => decide(r.id, false)}>Rechazar</Button>

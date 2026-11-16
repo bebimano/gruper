@@ -363,6 +363,7 @@ export type Database = {
           edit_used: boolean
           id: string
           number: number
+          user_number: number | null
           updated_at: string
           user_id: string
         }
@@ -374,6 +375,7 @@ export type Database = {
           edit_used?: boolean
           id?: string
           number?: number
+          user_number?: number | null
           updated_at?: string
           user_id?: string
         }
@@ -385,6 +387,7 @@ export type Database = {
           edit_used?: boolean
           id?: string
           number?: number
+          user_number?: number | null
           updated_at?: string
           user_id?: string
         }

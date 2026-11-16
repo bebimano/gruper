@@ -18,11 +18,12 @@ export function NewReportNotifier() {
     const channel = supabase
       .channel(`new-reports-${Math.random().toString(36).slice(2)}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "work_reports" }, async (payload) => {
-        const row = payload.new as { id: string; number: number; user_id: string; data: { cliente?: string } };
+        const row = payload.new as { id: string; number: number; user_number?: number | null; user_id: string; data: { cliente?: string } };
         qc.invalidateQueries({ queryKey: ["work-reports"] });
         if (row.user_id === myId) return;
         const { data: p } = await supabase.from("profiles").select("username").eq("id", row.user_id).maybeSingle();
-        toast.info(`Nuevo parte Nº ${row.number}`, {
+        const num = row.user_number ?? row.number;
+        toast.info(`Nuevo parte Nº ${num}`, {
           description: `${p?.username ?? "Un usuario"}${row.data?.cliente ? ` · ${row.data.cliente}` : ""}`,
           duration: 10000,
           action: { label: "Ver", onClick: () => navigate({ to: "/parte/$id", params: { id: row.id } }) },

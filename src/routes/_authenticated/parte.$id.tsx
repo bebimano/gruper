@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Plus, Printer, Trash2, X, Cpu } from "lucide-react";
+import { ArrowLeft, Plus, Printer, Trash2, X, Cpu, Download } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
@@ -17,7 +17,7 @@ import { useReportContacts } from "@/components/ReportContactsAdmin";
 import { useClientEquipment } from "@/components/ClientEquipmentAdmin";
 import { Mail } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
-import { buildReportPdf } from "@/lib/report-pdf";
+import { buildReportPdf, downloadReportPdf, getReportFilename } from "@/lib/report-pdf";
 import { sendReportEmail } from "@/lib/report-email.functions";
 import { notifyEvent } from "@/lib/notify.functions";
 
@@ -62,6 +62,7 @@ function Parte() {
   const [r, setR] = useState<WorkReport | null>(null);
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const sendFn = useServerFn(sendReportEmail);
   const notifyFn = useServerFn(notifyEvent);
 
@@ -74,6 +75,22 @@ function Parte() {
       return data;
     },
   });
+
+  const creator = useQuery({
+    queryKey: ["creator-username", existing.data?.user_id],
+    enabled: !isNew && !!existing.data?.user_id,
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("username").eq("id", existing.data!.user_id).maybeSingle();
+      return data?.username ?? "";
+    },
+  });
+
+  const creatorName = isNew
+    ? (me.data?.username ?? "")
+    : (creator.data || (existing.data?.user_id === me.data?.id ? me.data?.username ?? "" : "Usuario"));
+
+  const reportNum = existing.data ? (existing.data.user_number ?? existing.data.number) : null;
+
   const contacts = useReportContacts();
   const fixedEmails = useFixedEmails();
   // Load all client equipment to filter by selected client
@@ -101,13 +118,33 @@ function Parte() {
     if (!contactEmail && !fixed.length) { toast.error("No hay correos asociados. Pídeselos al administrador."); return; }
     setSending(true);
     try {
-      const pdf = await buildReportPdf(r!, existing.data?.number ?? "");
+      const pdf = await buildReportPdf(r!, reportNum ?? "", creatorName);
       const res = await sendFn({ data: { id, pdf } });
       toast.success(`Parte enviado a ${res.to.join(", ")}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo enviar");
     } finally { setSending(false); }
   }
+
+  async function downloadPdf() {
+    setDownloading(true);
+    try {
+      await downloadReportPdf(r!, reportNum ?? "nuevo", creatorName);
+      toast.success("PDF descargado");
+    } catch (e) {
+      toast.error("Error al generar el PDF");
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  function handlePrint() {
+    const originalTitle = document.title;
+    document.title = getReportFilename(reportNum ?? "nuevo", creatorName, r?.cliente).replace(/\.pdf$/, "");
+    window.print();
+    setTimeout(() => { document.title = originalTitle; }, 1000);
+  }
+
   async function requestEdit() {
     const { error } = await supabase.rpc("request_report_edit", { _id: id });
     if (error) { toast.error(error.message); return; }
@@ -123,8 +160,8 @@ function Parte() {
     setSaving(true);
     const payload = r as unknown as Json;
     const res = isNew
-      ? await supabase.from("work_reports").insert({ data: payload, closed: close }).select("id").single()
-      : await supabase.from("work_reports").update({ data: payload, closed: close, updated_at: new Date().toISOString() }).eq("id", id).select("id").single();
+      ? await supabase.from("work_reports").insert({ data: payload, closed: close }).select("id, number, user_number").single()
+      : await supabase.from("work_reports").update({ data: payload, closed: close, updated_at: new Date().toISOString() }).eq("id", id).select("id, number, user_number").single();
     setSaving(false);
     if (res.error) { toast.error(res.error.message); return; }
     toast.success(close ? "Parte cerrado" : "Parte guardado");
@@ -165,14 +202,23 @@ function Parte() {
       <header className="flex items-center justify-between py-3 print:hidden">
         <Link to="/partes" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Partes</Link>
         <div className="flex gap-1">
-          <Button variant="ghost" size="icon" onClick={() => window.print()} aria-label="Imprimir o PDF"><Printer /></Button>
-          {!isNew && (!closed || me.data?.isAdmin) && <Button variant="ghost" size="icon" onClick={remove} aria-label="Eliminar parte"><Trash2 /></Button>}
+          <Button variant="ghost" size="icon" onClick={downloadPdf} disabled={downloading} aria-label="Descargar PDF" title="Descargar PDF"><Download className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" onClick={handlePrint} aria-label="Imprimir o PDF" title="Imprimir"><Printer className="h-4 w-4" /></Button>
+          {!isNew && (!closed || me.data?.isAdmin) && <Button variant="ghost" size="icon" onClick={remove} aria-label="Eliminar parte"><Trash2 className="h-4 w-4" /></Button>}
         </div>
       </header>
       <div className="mt-2 mb-6">
         <p className="text-xs font-semibold uppercase tracking-wide text-primary">Servicio asistencia técnica</p>
-        <h1 className="text-2xl font-bold">Parte de trabajo {existing.data ? `Nº ${existing.data.number}` : "nuevo"}</h1>
-        {closed && <p className="mt-1 text-sm text-muted-foreground">{isAdmin ? "Cerrado — como administrador puedes modificarlo." : "Cerrado — ya no se puede modificar ni borrar."}</p>}
+        <h1 className="text-2xl font-bold">
+          Parte de trabajo {reportNum !== null ? `Nº ${reportNum}` : "nuevo"}
+        </h1>
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+          <span>Creado por: <strong className="font-medium text-foreground">{creatorName || "—"}</strong></span>
+          {existing.data?.created_at && (
+            <span>· Fecha: {new Date(existing.data.created_at).toLocaleDateString("es-ES")}</span>
+          )}
+        </div>
+        {closed && <p className="mt-2 text-sm text-muted-foreground">{isAdmin ? "Cerrado — como administrador puedes modificarlo." : "Cerrado — ya no se puede modificar ni borrar."}</p>}
       </div>
 
       <fieldset disabled={locked} className="min-w-0">

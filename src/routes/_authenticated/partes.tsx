@@ -26,7 +26,7 @@ function Partes() {
     queryKey: ["work-reports", me.data?.id],
     enabled: !!me.data?.canReports,
     queryFn: async () => {
-      let q = supabase.from("work_reports").select("id, number, data, created_at, user_id").order("created_at", { ascending: false });
+      let q = supabase.from("work_reports").select("id, number, user_number, data, created_at, user_id, closed").order("created_at", { ascending: false });
       if (me.data && !me.data.isAdmin) q = q.eq("user_id", me.data.id);
       const { data, error } = await q;
       if (error) throw error;
@@ -40,7 +40,8 @@ function Partes() {
   });
   const map = new Map<string, { userId: string; name: string; items: NonNullable<typeof reports.data> }>();
   for (const r of reports.data ?? []) {
-    const g = map.get(r.user_id) ?? { userId: r.user_id, name: names.data?.get(r.user_id) ?? (r.user_id === me.data?.id ? me.data?.username ?? "" : "Usuario"), items: [] };
+    const username = names.data?.get(r.user_id) ?? (r.user_id === me.data?.id ? me.data?.username ?? "" : "Usuario");
+    const g = map.get(r.user_id) ?? { userId: r.user_id, name: username, items: [] };
     g.items.push(r);
     map.set(r.user_id, g);
   }
@@ -64,14 +65,24 @@ function Partes() {
       <div className="divide-y divide-border rounded-xl border border-border bg-background">
         {g.items.map((r) => {
           const d = normalizeReport(r.data);
+          // Show per-user number (Nº personal), falls back to global number
+          const displayNum = r.user_number ?? r.number;
           return (
             <Link key={r.id} to="/parte/$id" params={{ id: r.id }} className="flex items-center gap-3 p-4 hover:bg-muted transition-colors">
-              <FileText className="h-5 w-5 text-primary" />
+              <FileText className="h-5 w-5 shrink-0 text-primary" />
               <span className="flex-1 min-w-0">
-                <span className="block font-medium truncate">Nº {r.number} · {d.cliente || "Sin cliente"}</span>
-                <span className="block text-xs text-muted-foreground">{new Date(r.created_at).toLocaleDateString("es-ES")} · {d.tecnico || "—"}</span>
+                <span className="block font-medium truncate">
+                  Parte Nº {displayNum} · {d.cliente || "Sin cliente"}
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  {new Date(r.created_at).toLocaleDateString("es-ES")}
+                  {" · "}
+                  <span className="font-medium text-foreground/70">{g.name}</span>
+                  {d.tecnico && d.tecnico !== g.name && ` · Técnico: ${d.tecnico}`}
+                  {r.closed && <span className="ml-1.5 inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium">Cerrado</span>}
+                </span>
               </span>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
             </Link>
           );
         })}
