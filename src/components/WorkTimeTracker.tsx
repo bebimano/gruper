@@ -9,6 +9,7 @@ import {
   calculateReportTotals,
   getCurrentTimeStr,
   getTodayDateStr,
+  syncDayWorkIntervals,
 } from "@/lib/time-calculator";
 
 interface WorkTimeTrackerProps {
@@ -60,14 +61,20 @@ export function WorkTimeTracker({ dias = [], onChange, disabled = false }: WorkT
   const openModal = (type: ModalType) => {
     if (disabled) return;
     const nowTime = getCurrentTimeStr();
-    setTempTime(nowTime);
 
-    // Solo se piden kilómetros en salida a cliente y salida de cliente
+    // Solo se piden kilómetros en salida a cliente y salida de cliente.
+    // Si la hora ya estaba registrada previamente en ese botón, se muestra esa hora para no sobreescribirla por accidente.
     if (type === "salida_ida") {
+      setTempTime(currentDay?.idaDe || nowTime);
       setTempKm(currentDay?.kmIda || "");
+    } else if (type === "llegada_cliente") {
+      setTempTime(currentDay?.idaA || nowTime);
+      setTempKm("");
     } else if (type === "salida_cliente") {
+      setTempTime(currentDay?.vueltaDe || nowTime);
       setTempKm(currentDay?.kmVuelta || currentDay?.kmIda || "");
-    } else {
+    } else if (type === "llegada_vuelta") {
+      setTempTime(currentDay?.vueltaA || nowTime);
       setTempKm("");
     }
 
@@ -77,7 +84,7 @@ export function WorkTimeTracker({ dias = [], onChange, disabled = false }: WorkT
   const handleConfirm = () => {
     const list = getEnsuredDias();
     const idx = list.length - 1;
-    const day = { ...list[idx]! };
+    let day = { ...list[idx]! };
     if (!day.fecha) day.fecha = getTodayDateStr();
 
     if (modalType === "salida_ida") {
@@ -88,28 +95,16 @@ export function WorkTimeTracker({ dias = [], onChange, disabled = false }: WorkT
       toast.success(`🚗 Salida a cliente registrada a las ${tempTime}${tempKm ? ` (${tempKm} km)` : ""}`);
     } else if (modalType === "llegada_cliente") {
       day.idaA = tempTime;
-      // Start work time at arrival if not yet set
-      const [h] = tempTime.split(":").map(Number);
-      if (h !== undefined && h >= 14) {
-        if (!day.tardeDe) day.tardeDe = tempTime;
-      } else {
-        if (!day.mananaDe) day.mananaDe = tempTime;
-      }
+      // Sincroniza inicio de mano de obra
+      day = syncDayWorkIntervals(day);
       list[idx] = day;
       onChange(list);
       toast.success(`📍 Llegada a cliente registrada a las ${tempTime}. ¡Mano de obra iniciada!`);
     } else if (modalType === "salida_cliente") {
-      // End work time
-      const [h] = tempTime.split(":").map(Number);
-      if (day.tardeDe || (h !== undefined && h >= 14)) {
-        if (!day.tardeA) day.tardeA = tempTime;
-      } else {
-        if (!day.mananaA) day.mananaA = tempTime;
-      }
-      // Set departure from client and return kilometers
       day.vueltaDe = tempTime;
       day.kmVuelta = tempKm.trim();
-
+      // Sincroniza fin de mano de obra (desde llegada hasta salida de cliente)
+      day = syncDayWorkIntervals(day);
       list[idx] = day;
       onChange(list);
       toast.success(`🚪 Salida de cliente registrada a las ${tempTime}${tempKm ? ` (${tempKm} km)` : ""}`);

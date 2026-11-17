@@ -1,7 +1,7 @@
 import { jsPDF } from "jspdf";
 import logo from "@/assets/gruper-logo.png.asset.json";
 import type { WorkReport } from "@/lib/work-report";
-import { calculateReportTotals } from "@/lib/time-calculator";
+import { calculateReportTotals, durationMinutes, timeToMinutes } from "@/lib/time-calculator";
 
 async function toDataUrl(url: string): Promise<string | null> {
   try {
@@ -93,12 +93,36 @@ export async function generatePdfDoc(r: WorkReport, number: string | number, cre
   const rg = (a: string, b: string) => (a || b ? `${a}-${b}` : "");
   for (const d of r.dias) {
     need(6);
+    let mananaStr = rg(d.mananaDe, d.mananaA);
+    let tardeStr = rg(d.tardeDe, d.tardeA);
+
+    // Si manana y tarde están vacías o suman 0 min pero existen llegada (idaA) y salida (vueltaDe) del cliente,
+    // se calculan y muestran directamente los tiempos de trabajo realizados en el cliente.
+    const workIntervalMin = durationMinutes(d.mananaDe, d.mananaA) + durationMinutes(d.tardeDe, d.tardeA);
+    if ((!mananaStr && !tardeStr) || (workIntervalMin === 0 && d.idaA && d.vueltaDe)) {
+      const sMin = timeToMinutes(d.idaA);
+      const eMin = timeToMinutes(d.vueltaDe);
+      if (sMin !== null && eMin !== null) {
+        const splitMin = 14 * 60;
+        if (sMin < splitMin && eMin > splitMin) {
+          mananaStr = `${d.idaA}-14:00`;
+          tardeStr = `14:00-${d.vueltaDe}`;
+        } else if (sMin >= splitMin) {
+          mananaStr = "";
+          tardeStr = `${d.idaA}-${d.vueltaDe}`;
+        } else {
+          mananaStr = `${d.idaA}-${d.vueltaDe}`;
+          tardeStr = "";
+        }
+      }
+    }
+
     [
       d.fecha ? new Date(d.fecha).toLocaleDateString("es-ES") : "",
       rg(d.idaDe, d.idaA),
       d.kmIda,
-      rg(d.mananaDe, d.mananaA),
-      rg(d.tardeDe, d.tardeA),
+      mananaStr,
+      tardeStr,
       rg(d.vueltaDe, d.vueltaA),
       d.kmVuelta,
     ].forEach((v, i) => doc.text(v || "", cx[i]!, y));

@@ -56,6 +56,52 @@ export type ReportTotals = {
 };
 
 /**
+ * Synchronizes morning (manana) and afternoon (tarde) intervals from client arrival (idaA)
+ * and client departure (vueltaDe).
+ */
+export function syncDayWorkIntervals(day: Dia): Dia {
+  if (!day.idaA) return day;
+
+  const sMin = timeToMinutes(day.idaA);
+  if (sMin === null) return day;
+
+  const splitMin = 14 * 60; // 14:00
+
+  if (day.vueltaDe) {
+    const eMin = timeToMinutes(day.vueltaDe);
+    if (eMin !== null) {
+      if (sMin < splitMin && eMin > splitMin) {
+        day.mananaDe = day.idaA;
+        day.mananaA = "14:00";
+        day.tardeDe = "14:00";
+        day.tardeA = day.vueltaDe;
+      } else if (sMin >= splitMin) {
+        day.mananaDe = "";
+        day.mananaA = "";
+        day.tardeDe = day.idaA;
+        day.tardeA = day.vueltaDe;
+      } else {
+        day.mananaDe = day.idaA;
+        day.mananaA = day.vueltaDe;
+        day.tardeDe = "";
+        day.tardeA = "";
+      }
+      return day;
+    }
+  }
+
+  // Arrival set, departure not yet set (in progress)
+  if (sMin >= splitMin) {
+    day.tardeDe = day.idaA;
+    day.tardeA = "";
+  } else {
+    day.mananaDe = day.idaA;
+    day.mananaA = "";
+  }
+  return day;
+}
+
+/**
  * Computes total work time (morning + afternoon intervals) and total kilometers
  * across all days registered in the report.
  */
@@ -69,9 +115,16 @@ export function calculateReportTotals(report: WorkReport): ReportTotals {
     travelMinutes += durationMinutes(d.idaDe, d.idaA);
     travelMinutes += durationMinutes(d.vueltaDe, d.vueltaA);
 
-    // Work labor duration (Mañana + Tarde)
-    workMinutes += durationMinutes(d.mananaDe, d.mananaA);
-    workMinutes += durationMinutes(d.tardeDe, d.tardeA);
+    // Work labor duration (Mano de obra)
+    // Regla principal: tiempo total desde que llega al cliente (idaA) hasta que sale del cliente (vueltaDe)
+    let dayWork = 0;
+    if (d.idaA && d.vueltaDe) {
+      dayWork = durationMinutes(d.idaA, d.vueltaDe);
+    } else {
+      // Fallback si no están ambos marcados
+      dayWork = durationMinutes(d.mananaDe, d.mananaA) + durationMinutes(d.tardeDe, d.tardeA);
+    }
+    workMinutes += dayWork;
 
     // Kilometers
     km += parseKm(d.kmIda);
