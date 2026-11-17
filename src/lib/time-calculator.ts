@@ -109,34 +109,44 @@ export function calculateReportTotals(report: WorkReport): ReportTotals {
   let workMinutes = 0;
   let travelMinutes = 0;
   let km = 0;
+  const isTaller = report.tipo === "taller";
 
   for (const d of report.dias || []) {
-    // Travel duration
-    travelMinutes += durationMinutes(d.idaDe, d.idaA);
-    travelMinutes += durationMinutes(d.vueltaDe, d.vueltaA);
+    if (!isTaller) {
+      // Travel duration (solo en partes con desplazamientos)
+      travelMinutes += durationMinutes(d.idaDe, d.idaA);
+      travelMinutes += durationMinutes(d.vueltaDe, d.vueltaA);
+
+      // Kilómetros
+      km += parseKm(d.kmIda);
+      km += parseKm(d.kmVuelta);
+    }
 
     // Work labor duration (Mano de obra)
-    // Regla principal: tiempo total desde que llega al cliente (idaA) hasta que sale del cliente (vueltaDe)
     let dayWork = 0;
-    if (d.idaA && d.vueltaDe) {
-      dayWork = durationMinutes(d.idaA, d.vueltaDe);
-    } else {
-      // Fallback si no están ambos marcados
+    if (isTaller) {
       dayWork = durationMinutes(d.mananaDe, d.mananaA) + durationMinutes(d.tardeDe, d.tardeA);
+      // Si solo tiene entrada de mañana y salida de tarde (jornada continua de taller)
+      if (dayWork === 0 && d.mananaDe && d.tardeA && !d.mananaA && !d.tardeDe) {
+        dayWork = durationMinutes(d.mananaDe, d.tardeA);
+      }
+    } else {
+      // Regla principal en clientes: tiempo total desde que llega al cliente (idaA) hasta que sale del cliente (vueltaDe)
+      if (d.idaA && d.vueltaDe) {
+        dayWork = durationMinutes(d.idaA, d.vueltaDe);
+      } else {
+        dayWork = durationMinutes(d.mananaDe, d.mananaA) + durationMinutes(d.tardeDe, d.tardeA);
+      }
     }
     workMinutes += dayWork;
-
-    // Kilometers
-    km += parseKm(d.kmIda);
-    km += parseKm(d.kmVuelta);
   }
 
   return {
     totalWorkMinutes: workMinutes,
     formattedWorkHours: formatMinutes(workMinutes),
-    totalTravelMinutes: travelMinutes,
-    formattedTravelHours: formatMinutes(travelMinutes),
-    totalKm: Math.round(km * 10) / 10,
+    totalTravelMinutes: isTaller ? 0 : travelMinutes,
+    formattedTravelHours: isTaller ? "0 min" : formatMinutes(travelMinutes),
+    totalKm: isTaller ? 0 : Math.round(km * 10) / 10,
   };
 }
 

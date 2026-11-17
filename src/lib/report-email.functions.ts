@@ -36,7 +36,9 @@ export const sendReportEmail = createServerFn({ method: "POST" })
       context.supabase.from("report_fixed_emails").select("email"),
     ]);
     const c = contacts?.find((x) => x.name.trim().toLowerCase() === cliente.toLowerCase());
-    const to = [...new Set([c?.email, ...(fixed ?? []).map((f) => f.email)].filter(Boolean))] as string[];
+    const clientEmails = c?.email ? c.email.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean) : [];
+    const fixedEmails = (fixed ?? []).flatMap((f) => (f.email || "").split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean));
+    const to = [...new Set([...clientEmails, ...fixedEmails])] as string[];
     if (!to.length) throw new Error("No hay correos asociados a este cliente");
 
     const key = process.env["LOVABLE_API_KEY"],
@@ -44,11 +46,14 @@ export const sendReportEmail = createServerFn({ method: "POST" })
     if (!key || !conn) throw new Error("Gmail no está configurado");
 
     const boundary = "gruper" + crypto.randomUUID();
-    const file = getReportFilename(num, creatorName, cliente);
+    const repData = (rep.data as { cliente?: string; tipo?: "trabajo" | "taller" }) ?? {};
+    const isTaller = repData.tipo === "taller";
+    const reportTypeTitle = isTaller ? "Parte de taller" : "Parte de trabajo";
+    const file = getReportFilename(num, creatorName, cliente, isTaller ? "taller" : "trabajo");
     const pdf = data.pdf.replace(/(.{76})/g, "$1\r\n");
 
-    const subjectStr = `Parte de trabajo Nº ${num}${creatorName ? ` (${creatorName})` : ""}${cliente ? ` — ${cliente}` : ""} — Gruper`;
-    const bodyStr = `Hola,\n\nAdjuntamos el parte de trabajo Nº ${num}${cliente ? ` correspondiente a ${cliente}` : ""}${creatorName ? ` realizado por ${creatorName}` : ""} firmado.\n\nUn saludo,\nGruper`;
+    const subjectStr = `${reportTypeTitle} Nº ${num}${creatorName ? ` (${creatorName})` : ""}${cliente ? ` — ${cliente}` : ""} — Gruper`;
+    const bodyStr = `Hola,\n\nAdjuntamos el ${reportTypeTitle.toLowerCase()} Nº ${num}${cliente ? ` correspondiente a ${cliente}` : ""}${creatorName ? ` realizado por ${creatorName}` : ""} firmado.\n\nUn saludo,\nGruper`;
 
     const mime = [
       `To: ${to.join(", ")}`,

@@ -1,7 +1,7 @@
 import { jsPDF } from "jspdf";
 import logo from "@/assets/gruper-logo.png.asset.json";
 import type { WorkReport } from "@/lib/work-report";
-import { calculateReportTotals, durationMinutes, timeToMinutes } from "@/lib/time-calculator";
+import { calculateReportTotals, durationMinutes, timeToMinutes, formatMinutes } from "@/lib/time-calculator";
 
 async function toDataUrl(url: string): Promise<string | null> {
   try {
@@ -16,10 +16,11 @@ async function toDataUrl(url: string): Promise<string | null> {
   }
 }
 
-/** Generates clean, standard filename: e.g. Parte_1_Juan_EmpresaABC.pdf */
-export function getReportFilename(number: string | number, creatorName?: string, cliente?: string): string {
+/** Generates clean, standard filename: e.g. Parte_1_Juan_EmpresaABC.pdf or Parte_Taller_1_... */
+export function getReportFilename(number: string | number, creatorName?: string, cliente?: string, tipo?: "trabajo" | "taller"): string {
   const clean = (s: string) => s.trim().replace(/[/\\?%*:|"<>]/g, "").replace(/\s+/g, "_");
-  const parts = [`Parte_${number || "nuevo"}`];
+  const prefix = tipo === "taller" ? "Parte_Taller" : "Parte";
+  const parts = [`${prefix}_${number || "nuevo"}`];
   if (creatorName?.trim()) parts.push(clean(creatorName));
   if (cliente?.trim()) parts.push(clean(cliente));
   return `${parts.join("_")}.pdf`;
@@ -27,6 +28,7 @@ export function getReportFilename(number: string | number, creatorName?: string,
 
 /** Generates the jsPDF document instance. */
 export async function generatePdfDoc(r: WorkReport, number: string | number, creatorName?: string): Promise<jsPDF> {
+  const isTaller = r.tipo === "taller";
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const W = 210, M = 14;
   let y = 14;
@@ -35,7 +37,12 @@ export async function generatePdfDoc(r: WorkReport, number: string | number, cre
   if (img) doc.addImage(img, "PNG", M, y, 50, 16);
 
   doc.setFontSize(9).setTextColor(100).text("SERVICIO ASISTENCIA TÉCNICA", W - M, y + 5, { align: "right" });
-  doc.setFontSize(16).setTextColor(0).setFont("helvetica", "bold").text(`Parte de trabajo Nº ${number}`, W - M, y + 13, { align: "right" });
+  doc.setFontSize(16).setTextColor(0).setFont("helvetica", "bold").text(
+    `${isTaller ? "Parte de taller" : "Parte de trabajo"} Nº ${number}`,
+    W - M,
+    y + 13,
+    { align: "right" }
+  );
   if (creatorName) {
     doc.setFontSize(9).setTextColor(80).setFont("helvetica", "normal").text(`Creado por: ${creatorName}`, W - M, y + 19, { align: "right" });
     y += 26;
@@ -78,66 +85,110 @@ export async function generatePdfDoc(r: WorkReport, number: string | number, cre
     ["Reparación", r.reparacion || "—"],
   ]);
 
-  title("Horas de trabajo");
+  title(isTaller ? "Horas de taller" : "Horas de trabajo");
   doc.setFontSize(8);
-  const cols = ["Fecha", "Ida", "Km", "Mañana", "Tarde", "Vuelta", "Km"];
-  const cx = [M, M + 26, M + 56, M + 70, M + 100, M + 130, M + 160];
-  doc.setFont("helvetica", "bold");
-  cols.forEach((c, i) => doc.text(c, cx[i]!, y));
-  doc.setFont("helvetica", "normal");
-  y += 5;
 
   const rg = (a: string, b: string) => (a || b ? `${a}-${b}` : "");
-  for (const d of r.dias) {
-    need(6);
-    let mananaStr = rg(d.mananaDe, d.mananaA);
-    let tardeStr = rg(d.tardeDe, d.tardeA);
 
-    // Si manana y tarde están vacías o suman 0 min pero existen llegada (idaA) y salida (vueltaDe) del cliente,
-    // se calculan y muestran directamente los tiempos de trabajo realizados en el cliente.
-    const workIntervalMin = durationMinutes(d.mananaDe, d.mananaA) + durationMinutes(d.tardeDe, d.tardeA);
-    if ((!mananaStr && !tardeStr) || (workIntervalMin === 0 && d.idaA && d.vueltaDe)) {
-      const sMin = timeToMinutes(d.idaA);
-      const eMin = timeToMinutes(d.vueltaDe);
-      if (sMin !== null && eMin !== null) {
-        const splitMin = 14 * 60;
-        if (sMin < splitMin && eMin > splitMin) {
-          mananaStr = `${d.idaA}-14:00`;
-          tardeStr = `14:00-${d.vueltaDe}`;
-        } else if (sMin >= splitMin) {
-          mananaStr = "";
-          tardeStr = `${d.idaA}-${d.vueltaDe}`;
-        } else {
-          mananaStr = `${d.idaA}-${d.vueltaDe}`;
-          tardeStr = "";
+  if (isTaller) {
+    // Tabla para parte de taller: sin desplazamientos ni kilómetros
+    const cols = ["Fecha", "Mañana (Entrada - Salida)", "Tarde (Entrada - Salida)", "Total Horas"];
+    const cx = [M, M + 36, M + 95, M + 155];
+    doc.setFont("helvetica", "bold");
+    cols.forEach((c, i) => doc.text(c, cx[i]!, y));
+    doc.setFont("helvetica", "normal");
+    y += 5;
+
+    for (const d of r.dias) {
+      need(6);
+      const mananaStr = rg(d.mananaDe, d.mananaA);
+      const tardeStr = rg(d.tardeDe, d.tardeA);
+      let dayMin = durationMinutes(d.mananaDe, d.mananaA) + durationMinutes(d.tardeDe, d.tardeA);
+      if (dayMin === 0 && d.mananaDe && d.tardeA && !d.mananaA && !d.tardeDe) {
+        dayMin = durationMinutes(d.mananaDe, d.tardeA);
+      }
+      [
+        d.fecha ? new Date(d.fecha).toLocaleDateString("es-ES") : "",
+        mananaStr || "—",
+        tardeStr || "—",
+        formatMinutes(dayMin),
+      ].forEach((v, i) => doc.text(v || "", cx[i]!, y));
+      y += 5;
+    }
+    y += 2;
+
+    const totals = calculateReportTotals(r);
+    if (totals.totalWorkMinutes > 0) {
+      need(9);
+      doc.setFillColor(240, 247, 255).rect(M, y, W - 2 * M, 6.5, "F");
+      doc.setFont("helvetica", "bold").setFontSize(8).setTextColor(37, 159, 253);
+      const summaryText = `TOTALES CALCULADOS:  Mano de obra de taller: ${totals.formattedWorkHours}`;
+      doc.text(summaryText, M + 3, y + 4.5);
+      doc.setTextColor(0).setFont("helvetica", "normal");
+      y += 9.5;
+    } else {
+      y += 1;
+    }
+  } else {
+    // Tabla normal con desplazamientos y kilómetros
+    const cols = ["Fecha", "Ida", "Km", "Mañana", "Tarde", "Vuelta", "Km"];
+    const cx = [M, M + 26, M + 56, M + 70, M + 100, M + 130, M + 160];
+    doc.setFont("helvetica", "bold");
+    cols.forEach((c, i) => doc.text(c, cx[i]!, y));
+    doc.setFont("helvetica", "normal");
+    y += 5;
+
+    for (const d of r.dias) {
+      need(6);
+      let mananaStr = rg(d.mananaDe, d.mananaA);
+      let tardeStr = rg(d.tardeDe, d.tardeA);
+
+      // Si manana y tarde están vacías o suman 0 min pero existen llegada (idaA) y salida (vueltaDe) del cliente,
+      // se calculan y muestran directamente los tiempos de trabajo realizados en el cliente.
+      const workIntervalMin = durationMinutes(d.mananaDe, d.mananaA) + durationMinutes(d.tardeDe, d.tardeA);
+      if ((!mananaStr && !tardeStr) || (workIntervalMin === 0 && d.idaA && d.vueltaDe)) {
+        const sMin = timeToMinutes(d.idaA);
+        const eMin = timeToMinutes(d.vueltaDe);
+        if (sMin !== null && eMin !== null) {
+          const splitMin = 14 * 60;
+          if (sMin < splitMin && eMin > splitMin) {
+            mananaStr = `${d.idaA}-14:00`;
+            tardeStr = `14:00-${d.vueltaDe}`;
+          } else if (sMin >= splitMin) {
+            mananaStr = "";
+            tardeStr = `${d.idaA}-${d.vueltaDe}`;
+          } else {
+            mananaStr = `${d.idaA}-${d.vueltaDe}`;
+            tardeStr = "";
+          }
         }
       }
+
+      [
+        d.fecha ? new Date(d.fecha).toLocaleDateString("es-ES") : "",
+        rg(d.idaDe, d.idaA),
+        d.kmIda,
+        mananaStr,
+        tardeStr,
+        rg(d.vueltaDe, d.vueltaA),
+        d.kmVuelta,
+      ].forEach((v, i) => doc.text(v || "", cx[i]!, y));
+      y += 5;
     }
+    y += 2;
 
-    [
-      d.fecha ? new Date(d.fecha).toLocaleDateString("es-ES") : "",
-      rg(d.idaDe, d.idaA),
-      d.kmIda,
-      mananaStr,
-      tardeStr,
-      rg(d.vueltaDe, d.vueltaA),
-      d.kmVuelta,
-    ].forEach((v, i) => doc.text(v || "", cx[i]!, y));
-    y += 5;
-  }
-  y += 2;
-
-  const totals = calculateReportTotals(r);
-  if (totals.totalKm > 0 || totals.totalWorkMinutes > 0 || totals.totalTravelMinutes > 0) {
-    need(9);
-    doc.setFillColor(240, 247, 255).rect(M, y, W - 2 * M, 6.5, "F");
-    doc.setFont("helvetica", "bold").setFontSize(8).setTextColor(37, 159, 253);
-    const summaryText = `TOTALES CALCULADOS:  Mano de obra: ${totals.formattedWorkHours}   |   Desplazamiento: ${totals.totalKm} Km${totals.formattedTravelHours ? ` (${totals.formattedTravelHours} viaje)` : ""}`;
-    doc.text(summaryText, M + 3, y + 4.5);
-    doc.setTextColor(0).setFont("helvetica", "normal");
-    y += 9.5;
-  } else {
-    y += 1;
+    const totals = calculateReportTotals(r);
+    if (totals.totalKm > 0 || totals.totalWorkMinutes > 0 || totals.totalTravelMinutes > 0) {
+      need(9);
+      doc.setFillColor(240, 247, 255).rect(M, y, W - 2 * M, 6.5, "F");
+      doc.setFont("helvetica", "bold").setFontSize(8).setTextColor(37, 159, 253);
+      const summaryText = `TOTALES CALCULADOS:  Mano de obra: ${totals.formattedWorkHours}   |   Desplazamiento: ${totals.totalKm} Km${totals.formattedTravelHours ? ` (${totals.formattedTravelHours} viaje)` : ""}`;
+      doc.text(summaryText, M + 3, y + 4.5);
+      doc.setTextColor(0).setFont("helvetica", "normal");
+      y += 9.5;
+    } else {
+      y += 1;
+    }
   }
 
   title("Trabajo realizado");
@@ -251,6 +302,6 @@ export async function buildReportPdf(r: WorkReport, number: string | number, cre
 /** Triggers a browser download of the report PDF with a descriptive filename. */
 export async function downloadReportPdf(r: WorkReport, number: string | number, creatorName?: string): Promise<void> {
   const doc = await generatePdfDoc(r, number, creatorName);
-  const filename = getReportFilename(number, creatorName, r.cliente);
+  const filename = getReportFilename(number, creatorName, r.cliente, r.tipo);
   doc.save(filename);
 }

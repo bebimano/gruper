@@ -25,10 +25,26 @@ export function ReportContactsAdmin() {
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { toast.error("Correo no válido"); return; }
-    const { error } = await supabase.from("report_contacts").upsert({ name: name.trim(), email: email.trim() }, { onConflict: "name" });
+    const rawList = email.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean);
+    if (!rawList.length) {
+      toast.error("Introduce al menos un correo electrónico");
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const invalid = rawList.find((e) => !emailRegex.test(e));
+    if (invalid) {
+      toast.error(`El correo "${invalid}" no tiene un formato válido`);
+      return;
+    }
+    const finalEmailStr = rawList.join(", ");
+
+    const { error } = await supabase.from("report_contacts").upsert(
+      { name: name.trim(), email: finalEmailStr },
+      { onConflict: "name" }
+    );
     if (error) { toast.error(error.message); return; }
     setName(""); setEmail("");
+    toast.success(`Correos para "${name.trim()}" guardados correctamente.`);
     qc.invalidateQueries({ queryKey: ["report-contacts"] });
   }
   async function remove(id: string) {
@@ -40,10 +56,19 @@ export function ReportContactsAdmin() {
   return (
     <div className="rounded-xl border border-border bg-background p-4 space-y-3">
       <h2 className="font-medium">Correos de clientes</h2>
-      <p className="text-sm text-muted-foreground">Al escribir este nombre en "Cliente" del parte, se usará este correo para enviarlo.</p>
-      <form onSubmit={add} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+      <p className="text-sm text-muted-foreground">
+        Al escribir este nombre en "Cliente" del parte, se enviará automáticamente a estos correos. Puedes poner varios correos separados por coma.
+      </p>
+      <form onSubmit={add} className="grid gap-2 sm:grid-cols-[1fr_1.5fr_auto]">
         <Input placeholder="Nombre del cliente" value={name} onChange={(e) => setName(e.target.value)} required />
-        <Input type="email" placeholder="correo@cliente.com" value={email} onChange={(e) => setEmail(e.target.value)} required autoCapitalize="none" />
+        <Input
+          type="text"
+          placeholder="correo1@cliente.com, correo2@cliente.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          autoCapitalize="none"
+        />
         <Button type="submit">Guardar</Button>
       </form>
       {list.data?.map((c) => (
