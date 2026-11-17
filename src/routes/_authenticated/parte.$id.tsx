@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Plus, Printer, Trash2, X, Cpu, Download, Mail, Send, Clock, Car } from "lucide-react";
+import { ArrowLeft, Plus, Printer, Trash2, X, Cpu, Download, Mail, Send, Clock, Car, FileText, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
@@ -40,10 +40,24 @@ export const Route = createFileRoute("/_authenticated/parte/$id")({
   component: Parte,
 });
 
-function Field({ label, value, onChange, type = "text" }: { label: string; value: string; onChange: (v: string) => void; type?: string }) {
+function Field({
+  label,
+  value,
+  onChange,
+  type = "text",
+  required = false,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  type?: string;
+  required?: boolean;
+}) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium text-muted-foreground">{label}</span>
+      <span className="mb-1 block text-xs font-medium text-muted-foreground">
+        {label} {required && <span className="text-destructive font-bold">*</span>}
+      </span>
       <Input type={type} value={value} onChange={(e) => onChange(e.target.value)} />
     </label>
   );
@@ -160,7 +174,7 @@ function Parte() {
 
   function handlePrint() {
     const originalTitle = document.title;
-    document.title = getReportFilename(formattedReportNum ?? "nuevo", creatorName, r?.cliente).replace(/\.pdf$/, "");
+    document.title = getReportFilename(formattedReportNum ?? "nuevo", creatorName, r?.cliente, r?.tipo).replace(/\.pdf$/, "");
     window.print();
     setTimeout(() => { document.title = originalTitle; }, 1000);
   }
@@ -193,6 +207,18 @@ function Parte() {
   }
 
   async function saveAndClose() {
+    if (!r!.vehiculo?.trim()) {
+      toast.error("Debes indicar el vehículo antes de cerrar el parte");
+      return;
+    }
+    if (!r!.de?.trim()) {
+      toast.error("Debes indicar la población antes de cerrar el parte");
+      return;
+    }
+    if (!r!.tecnico?.trim()) {
+      toast.error("Debes indicar el técnico antes de cerrar el parte");
+      return;
+    }
     if (!r!.firma) {
       toast.error("Falta la firma del cliente antes de cerrar");
       return;
@@ -299,11 +325,56 @@ function Parte() {
         </div>
       </header>
       <div className="mt-2 mb-6">
-        <p className="text-xs font-semibold uppercase tracking-wide text-primary">Servicio asistencia técnica</p>
-        <h1 className="text-2xl font-bold">
-          Parte de trabajo {reportNum !== null ? `Nº ${reportNum}` : "nuevo"}
-        </h1>
-        <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+              {r.tipo === "taller" ? "Taller" : "Servicio asistencia técnica"}
+            </p>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              {r.tipo === "taller" && <Wrench className="h-6 w-6 text-amber-500" />}
+              {r.tipo === "taller" ? "Parte de taller" : "Parte de trabajo"}{" "}
+              {reportNum !== null ? `Nº ${reportNum}` : "nuevo"}
+            </h1>
+          </div>
+
+          {/* Pestañas para cambiar el tipo de parte */}
+          {!locked ? (
+            <div className="inline-flex p-1 rounded-xl bg-muted/80 border border-border print:hidden">
+              <button
+                type="button"
+                onClick={() => set("tipo", "trabajo")}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs transition-all ${
+                  r.tipo !== "taller"
+                    ? "bg-background text-foreground shadow-xs font-semibold"
+                    : "text-muted-foreground hover:text-foreground font-medium"
+                }`}
+              >
+                <FileText className="h-3.5 w-3.5 text-primary" />
+                Parte de trabajo
+              </button>
+              <button
+                type="button"
+                onClick={() => set("tipo", "taller")}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs transition-all ${
+                  r.tipo === "taller"
+                    ? "bg-background text-amber-600 dark:text-amber-400 shadow-xs font-semibold"
+                    : "text-muted-foreground hover:text-foreground font-medium"
+                }`}
+              >
+                <Wrench className="h-3.5 w-3.5 text-amber-500" />
+                Parte de taller
+              </button>
+            </div>
+          ) : (
+            r.tipo === "taller" && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                <Wrench className="h-3.5 w-3.5" /> Parte de taller
+              </span>
+            )
+          )}
+        </div>
+
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           <span>Creado por: <strong className="font-medium text-foreground">{creatorName || "—"}</strong></span>
           {existing.data?.created_at && (
             <span>· Fecha: {new Date(existing.data.created_at).toLocaleDateString("es-ES")}</span>
@@ -341,15 +412,15 @@ function Parte() {
               {r.cliente && <span className="mt-1 block text-xs text-muted-foreground">{contactEmail ? `Correo: ${contactEmail}` : "Sin correo asociado"}</span>}
             </label>
             <Field label="Dirección" {...f("direccion")} />
-            <Field label="Población (De)" {...f("de")} />
-            <Field label="Técnico" {...f("tecnico")} />
+            <Field label="Población (De)" required {...f("de")} />
+            <Field label="Técnico" required {...f("tecnico")} />
 
             {/* Vehículo con selector de coches y matrículas */}
             <div className="space-y-1.5">
               <label className="block">
                 <span className="mb-1 flex items-center justify-between text-xs font-medium text-muted-foreground">
                   <span className="flex items-center gap-1.5">
-                    <Car className="h-3.5 w-3.5 text-primary" /> Vehículo (Coche y Matrícula)
+                    <Car className="h-3.5 w-3.5 text-primary" /> Vehículo (Coche y Matrícula) <span className="text-destructive font-bold">*</span>
                   </span>
                   {isAdmin && (
                     <Link

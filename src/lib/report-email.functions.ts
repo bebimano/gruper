@@ -44,11 +44,14 @@ export const sendReportEmail = createServerFn({ method: "POST" })
     if (!key || !conn) throw new Error("Gmail no está configurado");
 
     const boundary = "gruper" + crypto.randomUUID();
-    const file = getReportFilename(num, creatorName, cliente);
+    const repData = (rep.data as { cliente?: string; tipo?: "trabajo" | "taller" }) ?? {};
+    const isTaller = repData.tipo === "taller";
+    const reportTypeTitle = isTaller ? "Parte de taller" : "Parte de trabajo";
+    const file = getReportFilename(num, creatorName, cliente, isTaller ? "taller" : "trabajo");
     const pdf = data.pdf.replace(/(.{76})/g, "$1\r\n");
 
-    const subjectStr = `Parte de trabajo Nº ${num}${creatorName ? ` (${creatorName})` : ""}${cliente ? ` — ${cliente}` : ""} — Gruper`;
-    const bodyStr = `Hola,\n\nAdjuntamos el parte de trabajo Nº ${num}${cliente ? ` correspondiente a ${cliente}` : ""}${creatorName ? ` realizado por ${creatorName}` : ""} firmado.\n\nUn saludo,\nGruper`;
+    const subjectStr = `${reportTypeTitle} Nº ${num}${creatorName ? ` (${creatorName})` : ""}${cliente ? ` — ${cliente}` : ""} — Gruper`;
+    const bodyStr = `Hola,\n\nAdjuntamos el ${reportTypeTitle.toLowerCase()} Nº ${num}${cliente ? ` correspondiente a ${cliente}` : ""}${creatorName ? ` realizado por ${creatorName}` : ""} firmado.\n\nUn saludo,\nGruper`;
 
     const mime = [
       `To: ${to.join(", ")}`,

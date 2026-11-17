@@ -16,10 +16,11 @@ async function toDataUrl(url: string): Promise<string | null> {
   }
 }
 
-/** Generates clean, standard filename: e.g. Parte_1_Juan_EmpresaABC.pdf */
-export function getReportFilename(number: string | number, creatorName?: string, cliente?: string): string {
+/** Generates clean, standard filename: e.g. Parte_1_Juan_EmpresaABC.pdf or Parte_Taller_1_... */
+export function getReportFilename(number: string | number, creatorName?: string, cliente?: string, tipo?: "trabajo" | "taller"): string {
   const clean = (s: string) => s.trim().replace(/[/\\?%*:|"<>]/g, "").replace(/\s+/g, "_");
-  const parts = [`Parte_${number || "nuevo"}`];
+  const prefix = tipo === "taller" ? "Parte_Taller" : "Parte";
+  const parts = [`${prefix}_${number || "nuevo"}`];
   if (creatorName?.trim()) parts.push(clean(creatorName));
   if (cliente?.trim()) parts.push(clean(cliente));
   return `${parts.join("_")}.pdf`;
@@ -34,8 +35,9 @@ export async function generatePdfDoc(r: WorkReport, number: string | number, cre
   const img = await toDataUrl(logo.url);
   if (img) doc.addImage(img, "PNG", M, y, 50, 16);
 
-  doc.setFontSize(9).setTextColor(100).text("SERVICIO ASISTENCIA TÉCNICA", W - M, y + 5, { align: "right" });
-  doc.setFontSize(16).setTextColor(0).setFont("helvetica", "bold").text(`Parte de trabajo Nº ${number}`, W - M, y + 13, { align: "right" });
+  const isTaller = r.tipo === "taller";
+  doc.setFontSize(9).setTextColor(100).text(isTaller ? "TALLER" : "SERVICIO ASISTENCIA TÉCNICA", W - M, y + 5, { align: "right" });
+  doc.setFontSize(16).setTextColor(0).setFont("helvetica", "bold").text(`${isTaller ? "Parte de taller" : "Parte de trabajo"} Nº ${number}`, W - M, y + 13, { align: "right" });
   if (creatorName) {
     doc.setFontSize(9).setTextColor(80).setFont("helvetica", "normal").text(`Creado por: ${creatorName}`, W - M, y + 19, { align: "right" });
     y += 26;
@@ -251,6 +253,6 @@ export async function buildReportPdf(r: WorkReport, number: string | number, cre
 /** Triggers a browser download of the report PDF with a descriptive filename. */
 export async function downloadReportPdf(r: WorkReport, number: string | number, creatorName?: string): Promise<void> {
   const doc = await generatePdfDoc(r, number, creatorName);
-  const filename = getReportFilename(number, creatorName, r.cliente);
+  const filename = getReportFilename(number, creatorName, r.cliente, r.tipo);
   doc.save(filename);
 }
