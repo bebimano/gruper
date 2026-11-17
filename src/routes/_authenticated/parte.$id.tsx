@@ -148,8 +148,19 @@ function Parte() {
   const contactEmail = contacts.data?.find((c) => c.name.trim().toLowerCase() === r.cliente.trim().toLowerCase())?.email;
 
   async function sendEmail() {
+    const isTaller = r?.tipo === "taller";
     const fixed = (fixedEmails.data ?? []).map((x: { email: string }) => x.email);
-    if (!contactEmail && !fixed.length) { toast.error("No hay correos asociados. Pídeselos al administrador."); return; }
+    if (isTaller) {
+      if (!fixed.length) {
+        toast.error("No hay correos fijos configurados para enviar partes de taller.");
+        return;
+      }
+    } else {
+      if (!contactEmail && !fixed.length) {
+        toast.error("No hay correos asociados. Pídeselos al administrador.");
+        return;
+      }
+    }
     setSending(true);
     try {
       const pdf = await buildReportPdf(r!, formattedReportNum ?? "", creatorName);
@@ -240,8 +251,11 @@ function Parte() {
       if (isNew) notifyFn({ data: { event: "new_report", id: savedId } }).catch(() => {});
 
       // Envío automático del correo
+      const isTaller = r!.tipo === "taller";
       const fixed = (fixedEmails.data ?? []).map((x: { email: string }) => x.email);
-      if (contactEmail || fixed.length) {
+      const shouldSend = isTaller ? fixed.length > 0 : (contactEmail || fixed.length > 0);
+
+      if (shouldSend) {
         setSending(true);
         try {
           const pdf = await buildReportPdf(r!, savedNum, creatorName);
@@ -253,7 +267,11 @@ function Parte() {
           setSending(false);
         }
       } else {
-        toast.info("Parte cerrado. No se envió correo porque no hay correos asociados.");
+        toast.info(
+          isTaller
+            ? "Parte cerrado. No se envió correo porque no hay correos fijos configurados."
+            : "Parte cerrado. No se envió correo porque no hay correos asociados."
+        );
       }
 
       if (isNew) {
@@ -409,7 +427,15 @@ function Parte() {
                 }}
               />
               <datalist id="report-clients">{contacts.data?.map((c) => <option key={c.id} value={c.name} />)}</datalist>
-              {r.cliente && <span className="mt-1 block text-xs text-muted-foreground">{contactEmail ? `Correo: ${contactEmail}` : "Sin correo asociado"}</span>}
+              {r.cliente && (
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  {r.tipo === "taller"
+                    ? "Parte de taller: se enviará únicamente a los correos fijos"
+                    : contactEmail
+                    ? `Correo: ${contactEmail}`
+                    : "Sin correo asociado"}
+                </span>
+              )}
             </label>
             <Field label="Dirección" {...f("direccion")} />
             <Field label="Población (De)" required {...f("de")} />

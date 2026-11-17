@@ -31,22 +31,34 @@ export const sendReportEmail = createServerFn({ method: "POST" })
       .maybeSingle();
     const creatorName = creatorProfile?.username ? creatorProfile.username.trim() : "";
 
+    const repData = (rep.data as { cliente?: string; tipo?: "trabajo" | "taller" }) ?? {};
+    const isTaller = repData.tipo === "taller";
+    const reportTypeTitle = isTaller ? "Parte de taller" : "Parte de trabajo";
+
     const [{ data: contacts }, { data: fixed }] = await Promise.all([
       context.supabase.from("report_contacts").select("name, email"),
       context.supabase.from("report_fixed_emails").select("email"),
     ]);
-    const c = contacts?.find((x) => x.name.trim().toLowerCase() === cliente.toLowerCase());
-    const to = [...new Set([c?.email, ...(fixed ?? []).map((f) => f.email)].filter(Boolean))] as string[];
-    if (!to.length) throw new Error("No hay correos asociados a este cliente");
+
+    const fixedEmailsList = (fixed ?? []).map((f) => f.email).filter(Boolean);
+    let to: string[] = [];
+
+    if (isTaller) {
+      // Parte de taller: NO se envía al cliente, SOLO a correos fijos
+      to = [...new Set(fixedEmailsList)];
+      if (!to.length) throw new Error("No hay correos fijos configurados para enviar partes de taller");
+    } else {
+      // Parte de trabajo normal: cliente + correos fijos
+      const c = contacts?.find((x) => x.name.trim().toLowerCase() === cliente.toLowerCase());
+      to = [...new Set([c?.email, ...fixedEmailsList].filter(Boolean))] as string[];
+      if (!to.length) throw new Error("No hay correos asociados a este cliente ni correos fijos");
+    }
 
     const key = process.env["LOVABLE_API_KEY"],
       conn = process.env["GOOGLE_MAIL_API_KEY"];
     if (!key || !conn) throw new Error("Gmail no está configurado");
 
     const boundary = "gruper" + crypto.randomUUID();
-    const repData = (rep.data as { cliente?: string; tipo?: "trabajo" | "taller" }) ?? {};
-    const isTaller = repData.tipo === "taller";
-    const reportTypeTitle = isTaller ? "Parte de taller" : "Parte de trabajo";
     const file = getReportFilename(num, creatorName, cliente, isTaller ? "taller" : "trabajo");
     const pdf = data.pdf.replace(/(.{76})/g, "$1\r\n");
 
