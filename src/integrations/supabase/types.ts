@@ -222,6 +222,7 @@ export type Database = {
       profiles: {
         Row: {
           can_request_edit: boolean
+          can_view_all_reports: boolean
           can_work_reports: boolean
           created_at: string
           id: string
@@ -229,6 +230,7 @@ export type Database = {
         }
         Insert: {
           can_request_edit?: boolean
+          can_view_all_reports?: boolean
           can_work_reports?: boolean
           created_at?: string
           id: string
@@ -236,6 +238,7 @@ export type Database = {
         }
         Update: {
           can_request_edit?: boolean
+          can_view_all_reports?: boolean
           can_work_reports?: boolean
           created_at?: string
           id?: string

@@ -7,7 +7,6 @@ import { checkMachinesStatus } from "@/lib/machines.functions";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { createUserAccount, deleteClientUser, resetClientPassword, setUserRole } from "@/lib/users.functions";
-import { setUserReportViewAccess } from "@/lib/reports.functions";
 import { useMe } from "@/lib/useRole";
 import logo from "@/assets/gruper-logo.png.asset.json";
 import { Button } from "@/components/ui/button";
@@ -301,7 +300,6 @@ function ClientsAdmin({ myId }: { myId: string }) {
   const deleteFn = useServerFn(deleteClientUser);
   const resetFn = useServerFn(resetClientPassword);
   const setRoleFn = useServerFn(setUserRole);
-  const setViewAllFn = useServerFn(setUserReportViewAccess);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [newRole, setNewRole] = useState<"admin" | "client">("client");
@@ -475,13 +473,13 @@ function ClientsAdmin({ myId }: { myId: string }) {
                       <span className="block text-xs text-muted-foreground">Permite ver los partes de todos los clientes creados por otros compañeros</span>
                     </div>
                     <Switch checked={c.can_view_all_reports} onCheckedChange={async (v) => {
-                      try {
-                        await setViewAllFn({ data: { id: c.id, enabled: v } });
-                        toast.success(v ? "Permiso para ver todos los partes concedido" : "Permiso revocado");
-                        qc.invalidateQueries({ queryKey: ["admin-clients"] });
-                      } catch (e) {
-                        err(e);
+                      const { error } = await supabase.from("profiles").update({ can_view_all_reports: v } as any).eq("id", c.id);
+                      if (error) {
+                        err(error);
+                        return;
                       }
+                      toast.success(v ? "Permiso para ver todos los partes concedido" : "Permiso revocado");
+                      qc.invalidateQueries({ queryKey: ["admin-clients"] });
                     }} />
                   </label>
                 </>
