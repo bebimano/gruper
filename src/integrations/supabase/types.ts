@@ -226,6 +226,7 @@ export type Database = {
           can_work_reports: boolean
           created_at: string
           id: string
+          initials: string | null
           username: string
         }
         Insert: {
@@ -234,6 +235,7 @@ export type Database = {
           can_work_reports?: boolean
           created_at?: string
           id: string
+          initials?: string | null
           username: string
         }
         Update: {
@@ -242,6 +244,7 @@ export type Database = {
           can_work_reports?: boolean
           created_at?: string
           id?: string
+          initials?: string | null
           username?: string
         }
         Relationships: []

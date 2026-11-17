@@ -17,6 +17,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useMe } from "@/lib/useRole";
 import { normalizeReport } from "@/lib/work-report";
+import { useWorkerInitials, formatReportNumber } from "@/lib/worker-initials";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -65,6 +66,7 @@ interface WorkerGroup {
 
 function Partes() {
   const me = useMe();
+  const { getInitials } = useWorkerInitials();
   const [search, setSearch] = useState("");
   const [selectedWorkerFilter, setSelectedWorkerFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"client" | "worker">("client");
@@ -135,8 +137,10 @@ function Partes() {
     return rawList.filter((r) => {
       const d = normalizeReport(r.data);
       const clientName = (d.cliente || "").trim() || "Sin cliente";
-      const displayNum = String(r.user_number ?? r.number);
       const workerName = getWorkerName(r.user_id).toLowerCase();
+      const initials = getInitials(r.user_id, workerName);
+      const formattedNum = formatReportNumber(initials, r.created_at, r.user_number ?? r.number);
+      const rawNum = String(r.user_number ?? r.number);
 
       // Worker pill filter
       if (selectedWorkerFilter !== "all" && r.user_id !== selectedWorkerFilter) {
@@ -146,8 +150,12 @@ function Partes() {
       // Text search
       if (term) {
         const matchesClient = clientName.toLowerCase().includes(term);
-        const matchesNum = displayNum.toLowerCase().includes(term) || `parte ${displayNum}`.includes(term);
-        const matchesWorker = workerName.includes(term);
+        const matchesNum =
+          formattedNum.toLowerCase().includes(term) ||
+          rawNum.includes(term) ||
+          `parte ${rawNum}`.includes(term) ||
+          `parte ${formattedNum}`.toLowerCase().includes(term);
+        const matchesWorker = workerName.includes(term) || initials.toLowerCase().includes(term);
         const matchesTecnico = (d.tecnico || "").toLowerCase().includes(term);
         if (!matchesClient && !matchesNum && !matchesWorker && !matchesTecnico) {
           return false;
@@ -243,7 +251,8 @@ function Partes() {
 
   const renderReportCard = (r: RawReport, authorName: string) => {
     const d = normalizeReport(r.data);
-    const displayNum = r.user_number ?? r.number;
+    const initials = getInitials(r.user_id, authorName);
+    const formattedNum = formatReportNumber(initials, r.created_at, r.user_number ?? r.number);
 
     return (
       <Link
@@ -252,13 +261,13 @@ function Partes() {
         params={{ id: r.id }}
         className="group flex items-center gap-3.5 p-3 rounded-xl border border-border bg-card shadow-xs hover:border-primary/50 hover:bg-muted/50 transition-all"
       >
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-          <FileText className="h-4 w-4" />
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors font-mono text-xs font-bold">
+          {initials || <FileText className="h-4 w-4" />}
         </div>
 
         <span className="flex-1 min-w-0">
           <span className="block font-medium text-sm truncate text-foreground group-hover:text-primary transition-colors">
-            Parte Nº {displayNum}
+            Parte Nº {formattedNum}
           </span>
           <span className="block text-xs text-muted-foreground mt-0.5 truncate">
             {new Date(r.created_at).toLocaleDateString("es-ES")}

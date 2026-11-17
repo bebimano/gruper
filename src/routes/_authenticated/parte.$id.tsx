@@ -20,6 +20,7 @@ import { buildReportPdf, downloadReportPdf, getReportFilename } from "@/lib/repo
 import { sendReportEmail } from "@/lib/report-email.functions";
 import { notifyEvent } from "@/lib/notify.functions";
 import { logReportOpen } from "@/lib/reports.functions";
+import { useWorkerInitials, formatReportNumber } from "@/lib/worker-initials";
 import { ReportPhotos } from "@/components/ReportPhotos";
 import { WorkTimeTracker } from "@/components/WorkTimeTracker";
 import { DietasGastosSelector } from "@/components/DietasGastosSelector";
@@ -97,11 +98,16 @@ function Parte() {
     },
   });
 
+  const { getInitials } = useWorkerInitials();
   const creatorName = isNew
     ? (me.data?.username ?? "")
     : (creator.data || (existing.data?.user_id === me.data?.id ? me.data?.username ?? "" : "Usuario"));
 
-  const reportNum = existing.data ? (existing.data.user_number ?? existing.data.number) : null;
+  const creatorUserId = existing.data?.user_id || me.data?.id;
+  const creatorInitials = getInitials(creatorUserId, creatorName);
+  const rawNum = existing.data ? (existing.data.user_number ?? existing.data.number) : null;
+  const formattedReportNum = rawNum !== null ? formatReportNumber(creatorInitials, existing.data?.created_at, rawNum) : null;
+  const reportNum = formattedReportNum ?? rawNum;
 
   const contacts = useReportContacts();
   const fixedEmails = useFixedEmails();
@@ -130,7 +136,7 @@ function Parte() {
     if (!contactEmail && !fixed.length) { toast.error("No hay correos asociados. Pídeselos al administrador."); return; }
     setSending(true);
     try {
-      const pdf = await buildReportPdf(r!, reportNum ?? "", creatorName);
+      const pdf = await buildReportPdf(r!, formattedReportNum ?? "", creatorName);
       const res = await sendFn({ data: { id, pdf } });
       toast.success(`Parte enviado a ${res.to.join(", ")}`);
     } catch (e) {
@@ -141,7 +147,7 @@ function Parte() {
   async function downloadPdf() {
     setDownloading(true);
     try {
-      await downloadReportPdf(r!, reportNum ?? "nuevo", creatorName);
+      await downloadReportPdf(r!, formattedReportNum ?? "nuevo", creatorName);
       toast.success("PDF descargado");
     } catch (e) {
       toast.error("Error al generar el PDF");
@@ -152,7 +158,7 @@ function Parte() {
 
   function handlePrint() {
     const originalTitle = document.title;
-    document.title = getReportFilename(reportNum ?? "nuevo", creatorName, r?.cliente).replace(/\.pdf$/, "");
+    document.title = getReportFilename(formattedReportNum ?? "nuevo", creatorName, r?.cliente).replace(/\.pdf$/, "");
     window.print();
     setTimeout(() => { document.title = originalTitle; }, 1000);
   }
@@ -198,8 +204,9 @@ function Parte() {
 
       if (res.error) throw res.error;
       const savedId = res.data.id;
-      const savedNum = res.data.user_number ?? res.data.number;
-      toast.success("Parte cerrado");
+      const rawSavedNum = res.data.user_number ?? res.data.number;
+      const savedNum = formatReportNumber(creatorInitials, new Date(), rawSavedNum);
+      toast.success(`Parte Nº ${savedNum} cerrado`);
       qc.invalidateQueries({ queryKey: ["work-reports"] });
       qc.invalidateQueries({ queryKey: ["work-report", savedId] });
       if (isNew) notifyFn({ data: { event: "new_report", id: savedId } }).catch(() => {});

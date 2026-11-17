@@ -73,3 +73,5 @@ export function normalizeReport(d: unknown): WorkReport {
     fotos: Array.isArray(o.fotos) ? o.fotos : [],
   };
 }
+
+export { formatReportNumber } from "@/lib/worker-initials";
