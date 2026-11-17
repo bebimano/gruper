@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Plus, Printer, Trash2, X, Cpu, Download, Mail, Send, Clock, Car, Wrench } from "lucide-react";
+import { ArrowLeft, Plus, Printer, Trash2, X, Cpu, Download, Mail, Send, Clock, Car } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
@@ -60,7 +60,6 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function Parte() {
   const { id } = Route.useParams();
-  const searchTipo = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("tipo") : null;
   const isNew = id === "nuevo";
   const me = useMe();
   const navigate = useNavigate();
@@ -121,16 +120,15 @@ function Parte() {
   );
 
   useEffect(() => {
-    if (isNew && me.data && !r) setR(emptyReport(me.data.username.toUpperCase(), searchTipo === "taller" ? "taller" : "trabajo"));
+    if (isNew && me.data && !r) setR(emptyReport(me.data.username.toUpperCase()));
     if (!isNew && existing.data && !r) setR(normalizeReport(existing.data.data));
-  }, [isNew, me.data, existing.data, r, searchTipo]);
+  }, [isNew, me.data, existing.data, r]);
 
   if (!r) return <p className="p-8 text-center text-muted-foreground">{existing.isFetched && !existing.data ? "Parte no encontrado" : "Cargando…"}</p>;
 
   const closed = !!existing.data?.closed;
   const isAdmin = !!me.data?.isAdmin;
   const locked = closed && !isAdmin;
-  const isTaller = r?.tipo === "taller";
   const set = <K extends keyof WorkReport>(k: K, v: WorkReport[K]) => setR({ ...r, [k]: v });
   const f = (k: keyof WorkReport) => ({ value: r[k] as string, onChange: (v: string) => set(k, v as never) });
   const contactEmail = contacts.data?.find((c) => c.name.trim().toLowerCase() === r.cliente.trim().toLowerCase())?.email;
@@ -301,13 +299,9 @@ function Parte() {
         </div>
       </header>
       <div className="mt-2 mb-6">
-        <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-          {isTaller ? "Taller" : "Servicio asistencia técnica"}
-        </p>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          {isTaller && <Wrench className="h-6 w-6 text-amber-500" />}
-          {isTaller ? "Parte de taller" : "Parte de trabajo"}{" "}
-          {reportNum !== null ? `Nº ${reportNum}` : "nuevo"}
+        <p className="text-xs font-semibold uppercase tracking-wide text-primary">Servicio asistencia técnica</p>
+        <h1 className="text-2xl font-bold">
+          Parte de trabajo {reportNum !== null ? `Nº ${reportNum}` : "nuevo"}
         </h1>
         <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           <span>Creado por: <strong className="font-medium text-foreground">{creatorName || "—"}</strong></span>
@@ -456,12 +450,11 @@ function Parte() {
           )}
         </Section>
 
-        <Section title={isTaller ? "Horas de taller" : "Horas de trabajo"}>
+        <Section title="Horas de trabajo">
           <WorkTimeTracker
             dias={r.dias}
             onChange={(dias) => set("dias", dias)}
             disabled={locked}
-            isTaller={isTaller}
           />
         </Section>
 

@@ -25,7 +25,6 @@ export type DietasGastos = {
 };
 
 export type WorkReport = {
-  tipo?: "trabajo" | "taller";
   cliente: string; direccion: string; de: string; tecnico: string; vehiculo: string;
   codigoMaquina: string; numSerie: string; reparacion: string; suministro: string;
   materiales: string; instalacion: string;
@@ -49,9 +48,8 @@ export const emptyDietas = (): DietasGastos => ({
   pernoctaExt: 0,
 });
 
-export function emptyReport(tecnico = "", tipo: "trabajo" | "taller" = "trabajo"): WorkReport {
+export function emptyReport(tecnico = ""): WorkReport {
   return {
-    tipo,
     cliente: "", direccion: "", de: "", tecnico, vehiculo: "", codigoMaquina: "", numSerie: "",
     reparacion: "", suministro: "", materiales: "", instalacion: "",
     dias: [emptyDia()], trabajos: [emptyLinea()], materialesLista: [emptyLinea()],
@@ -67,7 +65,6 @@ export function normalizeReport(d: unknown): WorkReport {
   return {
     ...base,
     ...o,
-    tipo: o.tipo === "taller" ? "taller" : "trabajo",
     direccion: o.direccion ?? "",
     dias: o.dias?.length ? o.dias : base.dias,
     trabajos: o.trabajos?.length ? o.trabajos : base.trabajos,
