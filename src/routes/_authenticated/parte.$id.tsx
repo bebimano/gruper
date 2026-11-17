@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Plus, Printer, Trash2, X, Cpu, Download, Mail, Send, Clock } from "lucide-react";
+import { ArrowLeft, Plus, Printer, Trash2, X, Cpu, Download, Mail, Send, Clock, Car } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
@@ -15,6 +15,7 @@ import { MaterialPicker } from "@/components/MaterialPicker";
 import { useFixedEmails } from "@/components/FixedEmailsAdmin";
 import { useReportContacts } from "@/components/ReportContactsAdmin";
 import { useClientEquipment } from "@/components/ClientEquipmentAdmin";
+import { useVehicles } from "@/lib/vehicles";
 import { useServerFn } from "@tanstack/react-start";
 import { buildReportPdf, downloadReportPdf, getReportFilename } from "@/lib/report-pdf";
 import { sendReportEmail } from "@/lib/report-email.functions";
@@ -111,6 +112,7 @@ function Parte() {
 
   const contacts = useReportContacts();
   const fixedEmails = useFixedEmails();
+  const { vehicles } = useVehicles();
   // Load all client equipment to filter by selected client
   const allEquipment = useClientEquipment();
   const clientEquipment = (allEquipment.data ?? []).filter(
@@ -341,13 +343,69 @@ function Parte() {
             <Field label="Dirección" {...f("direccion")} />
             <Field label="Población (De)" {...f("de")} />
             <Field label="Técnico" {...f("tecnico")} />
-            <Field label="Vehículo" {...f("vehiculo")} />
+
+            {/* Vehículo con selector de coches y matrículas */}
+            <div className="space-y-1.5">
+              <label className="block">
+                <span className="mb-1 flex items-center justify-between text-xs font-medium text-muted-foreground">
+                  <span className="flex items-center gap-1.5">
+                    <Car className="h-3.5 w-3.5 text-primary" /> Vehículo (Coche y Matrícula)
+                  </span>
+                  {isAdmin && (
+                    <Link
+                      to="/admin"
+                      className="text-[11px] text-primary hover:underline font-normal print:hidden"
+                    >
+                      + Gestionar vehículos
+                    </Link>
+                  )}
+                </span>
+                <Input
+                  placeholder="Seleccionar o escribir vehículo..."
+                  list="report-vehicles"
+                  value={r.vehiculo}
+                  onChange={(e) => set("vehiculo", e.target.value)}
+                  disabled={locked}
+                />
+                <datalist id="report-vehicles">
+                  {vehicles.map((v) => (
+                    <option key={v.id} value={`${v.name} · ${v.matricula}`}>
+                      {v.matricula} - {v.name}
+                    </option>
+                  ))}
+                </datalist>
+              </label>
+
+              {/* Botones de selección rápida si hay vehículos registrados */}
+              {vehicles.length > 0 && !locked && (
+                <div className="flex flex-wrap gap-1.5 pt-0.5 print:hidden">
+                  {vehicles.map((v) => {
+                    const label = `${v.name} · ${v.matricula}`;
+                    const isSelected = r.vehiculo === label || r.vehiculo.includes(v.matricula);
+                    return (
+                      <button
+                        key={v.id}
+                        type="button"
+                        onClick={() => set("vehiculo", label)}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs transition-all border ${
+                          isSelected
+                            ? "bg-primary text-primary-foreground border-primary font-semibold shadow-xs"
+                            : "bg-muted/70 text-foreground border-border hover:border-primary/50 hover:bg-muted"
+                        }`}
+                      >
+                        <Car className="h-3 w-3" />
+                        <span>{v.name}</span>
+                        <span className="font-mono font-bold text-[11px] opacity-90">({v.matricula})</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             <Field label="Modelo / Código máquina" {...f("codigoMaquina")} />
             <Field label="Nº serie" {...f("numSerie")} />
             <Field label="Reparación" {...f("reparacion")} />
-            <Field label="Suministro" {...f("suministro")} />
-            <Field label="Materiales" {...f("materiales")} />
-            <Field label="Instalación" {...f("instalacion")} />
           </div>
 
           {/* Machine quick-pick: shown when there are registered machines for the selected client */}

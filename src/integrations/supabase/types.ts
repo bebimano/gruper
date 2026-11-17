@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      vehicles: {
+        Row: {
+          created_at: string
+          id: string
+          matricula: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          matricula: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          matricula?: string
+          name?: string
+        }
+        Relationships: []
+      }
       contact_submissions: {
         Row: {
           company: string

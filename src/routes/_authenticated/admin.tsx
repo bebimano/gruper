@@ -22,6 +22,7 @@ import { FixedEmailsAdmin } from "@/components/FixedEmailsAdmin";
 import { NotificationSettingsAdmin } from "@/components/NotificationSettingsAdmin";
 import { ClientEquipmentAdmin } from "@/components/ClientEquipmentAdmin";
 import { WorkerInitialsAdmin } from "@/components/WorkerInitialsAdmin";
+import { VehiclesAdmin } from "@/components/VehiclesAdmin";
 
 function EditRequests() {
   const qc = useQueryClient();
@@ -95,6 +96,7 @@ function Admin() {
           <TabsTrigger value="opens" className="flex-1">Accesos</TabsTrigger>
           <TabsTrigger value="messages" className="flex-1">Mensajes</TabsTrigger>
           <TabsTrigger value="reports" className="flex-1">Partes</TabsTrigger>
+          <TabsTrigger value="vehicles" className="flex-1">Vehículos</TabsTrigger>
           <TabsTrigger value="stock" className="flex-1">Stock</TabsTrigger>
           <TabsTrigger value="notify" className="flex-1">Avisos</TabsTrigger>
         </TabsList>
@@ -114,10 +116,16 @@ function Admin() {
               <p className="text-sm text-muted-foreground">Activa "Partes de trabajo" en cada cliente desde la pestaña Usuarios. Los administradores tienen acceso automático a todos los partes.</p>
               <Button asChild variant="outline" className="w-full"><Link to="/partes"><FileText /> Ver todos los partes</Link></Button>
             </div>
+            <VehiclesAdmin />
             <WorkerInitialsAdmin />
             <EditRequests />
             <FixedEmailsAdmin />
             <ReportContactsAdmin />
+          </div>
+        </TabsContent>
+        <TabsContent value="vehicles">
+          <div className="mt-4">
+            <VehiclesAdmin />
           </div>
         </TabsContent>
         <TabsContent value="stock"><MaterialsAdmin /></TabsContent>
