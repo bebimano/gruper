@@ -315,12 +315,12 @@ function Partes() {
         </Link>
         <div className="flex items-center gap-2">
           <Button asChild size="sm">
-            <Link to="/parte/$id" params={{ id: "nuevo" }} search={{ tipo: "trabajo" }}>
+            <Link to="/parte/$id" params={{ id: "nuevo" }}>
               <Plus className="h-4 w-4 mr-1" /> Nuevo parte
             </Link>
           </Button>
           <Button asChild size="sm" variant="outline" className="border-amber-500/40 text-amber-600 hover:bg-amber-500/10 hover:text-amber-700 dark:text-amber-400 font-medium">
-            <Link to="/parte/$id" params={{ id: "nuevo" }} search={{ tipo: "taller" }}>
+            <Link to="/parte/$id" params={{ id: "nuevo" }} search={{ tipo: "taller" } as any}>
               <Wrench className="h-4 w-4 mr-1.5 text-amber-600 dark:text-amber-400" /> Nuevo parte de taller
             </Link>
           </Button>

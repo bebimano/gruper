@@ -27,9 +27,6 @@ import { WorkTimeTracker } from "@/components/WorkTimeTracker";
 import { DietasGastosSelector } from "@/components/DietasGastosSelector";
 
 export const Route = createFileRoute("/_authenticated/parte/$id")({
-  validateSearch: (s: Record<string, unknown>): { tipo?: "trabajo" | "taller" } => ({
-    tipo: s?.tipo === "taller" ? "taller" : s?.tipo === "trabajo" ? "trabajo" : undefined,
-  }),
   head: () => ({
     meta: [
       { title: "Parte de trabajo — Gruper Remote" },
@@ -63,7 +60,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function Parte() {
   const { id } = Route.useParams();
-  const { tipo: searchTipo } = Route.useSearch();
+  const searchTipo = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("tipo") : null;
   const isNew = id === "nuevo";
   const me = useMe();
   const navigate = useNavigate();
