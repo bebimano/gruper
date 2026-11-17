@@ -10,6 +10,7 @@ import { emptyDia, emptyLinea, emptyReport, normalizeReport, type Linea, type Wo
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { SignaturePad } from "@/components/SignaturePad";
 import { MaterialPicker } from "@/components/MaterialPicker";
 import { useFixedEmails } from "@/components/FixedEmailsAdmin";
@@ -82,6 +83,7 @@ function Parte() {
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [closingConfirmOpen, setClosingConfirmOpen] = useState(false);
   const sendFn = useServerFn(sendReportEmail);
   const notifyFn = useServerFn(notifyEvent);
   const logOpenFn = useServerFn(logReportOpen);
@@ -217,7 +219,7 @@ function Parte() {
     }
   }
 
-  async function saveAndClose() {
+  function handleStartClose() {
     if (!r!.vehiculo?.trim()) {
       toast.error("Debes indicar el vehículo antes de cerrar el parte");
       return;
@@ -234,9 +236,20 @@ function Parte() {
       toast.error("Falta la firma del cliente antes de cerrar");
       return;
     }
+    setClosingConfirmOpen(true);
+  }
+
+  async function executeSaveAndClose(selectedTipo: "trabajo" | "taller") {
+    setClosingConfirmOpen(false);
     setSaving(true);
     try {
-      const payload = r as unknown as Json;
+      const updatedReport: WorkReport = {
+        ...r!,
+        tipo: selectedTipo,
+      };
+      setR(updatedReport);
+
+      const payload = updatedReport as unknown as Json;
       const res = isNew
         ? await supabase.from("work_reports").insert({ data: payload, closed: true }).select("id, number, user_number").single()
         : await supabase.from("work_reports").update({ data: payload, closed: true, updated_at: new Date().toISOString() }).eq("id", id).select("id, number, user_number").single();
@@ -245,20 +258,20 @@ function Parte() {
       const savedId = res.data.id;
       const rawSavedNum = res.data.user_number ?? res.data.number;
       const savedNum = formatReportNumber(creatorInitials, new Date(), rawSavedNum);
-      toast.success(`Parte Nº ${savedNum} cerrado`);
+      toast.success(`${selectedTipo === "taller" ? "Parte de taller" : "Parte de trabajo"} Nº ${savedNum} cerrado`);
       qc.invalidateQueries({ queryKey: ["work-reports"] });
       qc.invalidateQueries({ queryKey: ["work-report", savedId] });
       if (isNew) notifyFn({ data: { event: "new_report", id: savedId } }).catch(() => {});
 
       // Envío automático del correo
-      const isTaller = r!.tipo === "taller";
+      const isTaller = selectedTipo === "taller";
       const fixed = (fixedEmails.data ?? []).map((x: { email: string }) => x.email);
       const shouldSend = isTaller ? fixed.length > 0 : (contactEmail || fixed.length > 0);
 
       if (shouldSend) {
         setSending(true);
         try {
-          const pdf = await buildReportPdf(r!, savedNum, creatorName);
+          const pdf = await buildReportPdf(updatedReport, savedNum, creatorName);
           const emailRes = await sendFn({ data: { id: savedId, pdf } });
           toast.success(`Parte enviado por correo a ${emailRes.to.join(", ")}`);
         } catch (mailErr) {
@@ -597,7 +610,7 @@ function Parte() {
                 <Mail className="h-4 w-4 mr-1.5" /> {sending ? "Enviando…" : "Reenviar por correo"}
               </Button>
               {isAdmin ? (
-                <Button className="flex-1 font-semibold" onClick={saveAndClose} disabled={saving || sending}>
+                <Button className="flex-1 font-semibold" onClick={handleStartClose} disabled={saving || sending}>
                   <Send className="h-4 w-4 mr-1.5" />
                   {saving ? "Guardando…" : sending ? "Enviando…" : "Guardar cambios y reenviar"}
                 </Button>
@@ -613,7 +626,7 @@ function Parte() {
             </div>
           ) : (
             <div className="flex gap-2">
-              <Button className="w-full font-semibold" onClick={saveAndClose} disabled={saving || sending}>
+              <Button className="w-full font-semibold" onClick={handleStartClose} disabled={saving || sending}>
                 <Send className="h-4 w-4 mr-1.5" />
                 {saving ? "Cerrando parte…" : sending ? "Enviando correo…" : "Cerrar y enviar parte"}
               </Button>
@@ -621,6 +634,85 @@ function Parte() {
           )}
         </div>
       </div>
+
+      {/* Ventana modal de confirmación de tipo de parte al cerrar */}
+      <Dialog open={closingConfirmOpen} onOpenChange={setClosingConfirmOpen}>
+        <DialogContent className="max-w-md p-6">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-foreground">
+              ¿Qué tipo de parte deseas enviar y cerrar?
+            </DialogTitle>
+          </DialogHeader>
+
+          <p className="text-sm text-muted-foreground mt-1">
+            Selecciona el tipo de parte para registrarlo y enviarlo a los destinatarios correspondientes:
+          </p>
+
+          <div className="grid grid-cols-1 gap-3 my-4">
+            {/* Opción 1: Parte de trabajo */}
+            <button
+              type="button"
+              disabled={saving || sending}
+              onClick={() => executeSaveAndClose("trabajo")}
+              className="flex items-start gap-3.5 p-3.5 rounded-xl border-2 border-primary/30 hover:border-primary bg-primary/5 hover:bg-primary/10 text-left transition-all group"
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold shadow-xs">
+                <FileText className="h-5 w-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
+                    Parte de trabajo
+                  </span>
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-primary/20 text-primary">
+                    Cliente + Fijos
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Se enviará al correo del cliente ({contactEmail || "sin correo asociado"}) y a los correos fijos.
+                </p>
+              </div>
+            </button>
+
+            {/* Opción 2: Parte de taller */}
+            <button
+              type="button"
+              disabled={saving || sending}
+              onClick={() => executeSaveAndClose("taller")}
+              className="flex items-start gap-3.5 p-3.5 rounded-xl border-2 border-amber-500/30 hover:border-amber-500 bg-amber-500/5 hover:bg-amber-500/10 text-left transition-all group"
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-white font-bold shadow-xs">
+                <Wrench className="h-5 w-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-sm text-foreground group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+                    Parte de taller
+                  </span>
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                    Solo Fijos
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  <strong>NO</strong> se enviará al cliente. Se enviará únicamente a los correos fijos de la empresa.
+                </p>
+              </div>
+            </button>
+          </div>
+
+          <DialogFooter className="flex justify-end gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setClosingConfirmOpen(false)}
+              disabled={saving || sending}
+            >
+              Cancelar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }
