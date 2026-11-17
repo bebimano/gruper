@@ -27,8 +27,8 @@ import { WorkTimeTracker } from "@/components/WorkTimeTracker";
 import { DietasGastosSelector } from "@/components/DietasGastosSelector";
 
 export const Route = createFileRoute("/_authenticated/parte/$id")({
-  validateSearch: (s: Record<string, unknown>) => ({
-    tipo: s.tipo === "taller" ? ("taller" as const) : ("trabajo" as const),
+  validateSearch: (s: Record<string, unknown>): { tipo?: "trabajo" | "taller" } => ({
+    tipo: s?.tipo === "taller" ? "taller" : s?.tipo === "trabajo" ? "trabajo" : undefined,
   }),
   head: () => ({
     meta: [
@@ -124,9 +124,9 @@ function Parte() {
   );
 
   useEffect(() => {
-    if (isNew && me.data && !r) setR(emptyReport(me.data.username.toUpperCase(), searchTipo));
+    if (isNew && me.data && !r) setR(emptyReport(me.data.username.toUpperCase(), searchTipo === "taller" ? "taller" : "trabajo"));
     if (!isNew && existing.data && !r) setR(normalizeReport(existing.data.data));
-  }, [isNew, me.data, existing.data, r]);
+  }, [isNew, me.data, existing.data, r, searchTipo]);
 
   if (!r) return <p className="p-8 text-center text-muted-foreground">{existing.isFetched && !existing.data ? "Parte no encontrado" : "Cargando…"}</p>;
 
