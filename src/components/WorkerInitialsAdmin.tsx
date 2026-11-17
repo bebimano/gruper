@@ -56,7 +56,7 @@ export function WorkerInitialsAdmin() {
           </h3>
           <p className="text-xs text-muted-foreground mt-0.5">
             Configura las iniciales de cada trabajador. Los partes se numerarán automáticamente con el formato:{" "}
-            <strong className="text-foreground">[INICIALES][AÑO][00001]</strong>
+            <strong className="text-foreground">[INICIALES][AA][0001]</strong> (ej: BM260001)
           </p>
         </div>
       </div>

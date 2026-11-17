@@ -24,12 +24,12 @@ function setLocalCache(map: Record<string, string>) {
 
 /**
  * Formats a report number in the custom company format:
- * [INICIALES][AÑO][00001]
- * - Initials of the technician (e.g. "JR", "MB")
- * - 4-digit Year (e.g. "2026")
- * - 5-digit zero-padded sequential number (e.g. "00001", "00002", "00015")
+ * [INICIALES][AÑO 2 DIGITOS][0001]
+ * - Initials of the technician (e.g. "BM", "JR")
+ * - 2-digit Year (e.g. "26" for 2026)
+ * - 4-digit zero-padded sequential number (e.g. "0001", "0002", "0015")
  *
- * Example: initials "JR", year 2026, num 1 => "JR202600001"
+ * Example: initials "BM", year 2026, num 1 => "BM260001"
  */
 export function formatReportNumber(
   initials?: string | null,
@@ -53,9 +53,10 @@ export function formatReportNumber(
   }
 
   const cleanInit = (initials || "").trim().toUpperCase();
-  const seq = String(n).padStart(5, "0");
+  const year2Digits = String(year).slice(-2);
+  const seq = String(n).padStart(4, "0");
 
-  return cleanInit ? `${cleanInit}${year}${seq}` : `${year}${seq}`;
+  return cleanInit ? `${cleanInit}${year2Digits}${seq}` : `${year2Digits}${seq}`;
 }
 
 export type WorkerProfileInfo = {
