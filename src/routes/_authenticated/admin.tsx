@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { ArrowLeft, Trash2, KeyRound, FileText, RefreshCw, Shield, AlertTriangle, Bell } from "lucide-react";
+import { ArrowLeft, Trash2, KeyRound, FileText, RefreshCw, Shield, AlertTriangle, Bell, Wrench } from "lucide-react";
 import { checkMachinesStatus } from "@/lib/machines.functions";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,6 +14,10 @@ import {
   getAveriaNotifyRecipients,
   setAveriaNotifyRecipient,
 } from "@/lib/averias.functions";
+import {
+  getJobCreatorRecipients,
+  setUserCanCreateJobs,
+} from "@/lib/jobs.functions";
 import logo from "@/assets/gruper-logo.png.asset.json";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -351,6 +355,8 @@ function ClientsAdmin({ myId }: { myId: string }) {
   const getAllAllowedFn = useServerFn(getAllAllowedAveriasClients);
   const getAveriaRecipientsFn = useServerFn(getAveriaNotifyRecipients);
   const setAveriaRecipientFn = useServerFn(setAveriaNotifyRecipient);
+  const getJobCreatorsFn = useServerFn(getJobCreatorRecipients);
+  const setJobCreatorFn = useServerFn(setUserCanCreateJobs);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [newRole, setNewRole] = useState<"admin" | "client">("client");
@@ -358,15 +364,24 @@ function ClientsAdmin({ myId }: { myId: string }) {
   const clients = useQuery({
     queryKey: ["admin-clients"],
     queryFn: async () => {
-      const [{ data: profiles }, { data: access }, { data: roles }, allowedAveriasList, notifyRecipientsList] = await Promise.all([
+      const [
+        { data: profiles },
+        { data: access },
+        { data: roles },
+        allowedAveriasList,
+        notifyRecipientsList,
+        jobCreatorsList,
+      ] = await Promise.all([
         supabase.from("profiles").select("*").order("username"),
         supabase.from("machine_access").select("user_id, machine_id"),
         supabase.from("user_roles").select("user_id, role"),
         getAllAllowedFn().catch(() => []),
         getAveriaRecipientsFn().catch(() => []),
+        getJobCreatorsFn().catch(() => []),
       ]);
       const allowedAverias = new Set(allowedAveriasList ?? []);
       const notifyRecipients = new Set(notifyRecipientsList ?? []);
+      const jobCreators = new Set(jobCreatorsList ?? []);
       const roleMap = new Map((roles ?? []).map((r) => [r.user_id, r.role]));
       return (profiles ?? []).filter((p) => p.id !== myId).map((p) => {
         const item = p as any;
@@ -375,6 +390,7 @@ function ClientsAdmin({ myId }: { myId: string }) {
           ...item,
           can_view_all_reports: !!item.can_view_all_reports,
           can_averias: !!item.can_averias || allowedAverias.has(item.id),
+          can_create_jobs: isAdminUser || !!item.can_create_jobs || jobCreators.has(item.id),
           receives_averia_alerts: isAdminUser || notifyRecipients.has(item.id),
           role: (roleMap.get(item.id) as "admin" | "client") ?? "client",
           isAdmin: isAdminUser,
@@ -383,6 +399,17 @@ function ClientsAdmin({ myId }: { myId: string }) {
       });
     },
   });
+
+  async function toggleCreateJobs(id: string, on: boolean) {
+    try {
+      await setJobCreatorFn({ data: { userId: id, enabled: on } });
+      toast.success(on ? "Permiso para crear trabajos concedido" : "Permiso para crear trabajos revocado");
+      qc.invalidateQueries({ queryKey: ["admin-clients"] });
+      qc.invalidateQueries({ queryKey: ["me"] });
+    } catch (e) {
+      err(e);
+    }
+  }
 
   async function toggleAverias(id: string, on: boolean) {
     try {
@@ -535,6 +562,16 @@ function ClientsAdmin({ myId }: { myId: string }) {
               <label className="flex items-center justify-between rounded-lg bg-muted/60 px-3 py-2 text-sm">
                 <span className="flex items-center gap-2"><FileText className="h-4 w-4 text-primary" /> Partes de trabajo</span>
                 <Switch checked={c.can_work_reports} onCheckedChange={(v) => toggleReports(c.id, v)} />
+              </label>
+              <label className="flex items-center justify-between rounded-lg bg-muted/60 px-3 py-2 text-sm">
+                <div className="flex items-center gap-2">
+                  <Wrench className="h-4 w-4 text-primary" />
+                  <div>
+                    <span className="font-medium">Crear y asignar trabajos para otros</span>
+                    <span className="block text-xs text-muted-foreground">Permite al usuario crear trabajos y asignárselos a compañeros</span>
+                  </div>
+                </div>
+                <Switch checked={c.can_create_jobs} onCheckedChange={(v) => toggleCreateJobs(c.id, v)} />
               </label>
               <label className="flex items-center justify-between rounded-lg bg-muted/60 px-3 py-2 text-sm">
                 <div className="flex items-center gap-2">
