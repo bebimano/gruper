@@ -303,7 +303,8 @@ export const submitAveria = createServerFn({ method: "POST" })
       .object({
         machineId: z.string().optional().default(""),
         machineName: z.string().min(1, "Selecciona una máquina"),
-        title: z.string().min(1, "Introduce el título del fallo"),
+        clientName: z.string().optional(),
+        title: z.string().optional().default(""),
         description: z.string().min(1, "Describe el problema"),
         urgency: z.enum(["normal", "urgente"]).default("normal"),
         photos: z.array(photoSchema).default([]),
@@ -321,7 +322,9 @@ export const submitAveria = createServerFn({ method: "POST" })
       .select("username")
       .eq("id", userId)
       .maybeSingle();
-    const clientName = profile?.username || "Cliente";
+
+    const clientName = data.clientName?.trim() || profile?.username || "Cliente";
+    const finalTitle = data.title?.trim() || data.machineName;
 
     const payload = {
       type: "averia",
@@ -329,7 +332,7 @@ export const submitAveria = createServerFn({ method: "POST" })
       clientName,
       machineId: data.machineId,
       machineName: data.machineName,
-      title: data.title,
+      title: finalTitle,
       description: data.description,
       urgency: data.urgency,
       photos: data.photos,
@@ -351,7 +354,7 @@ export const submitAveria = createServerFn({ method: "POST" })
     const { data: job, error: jobErr } = await supabaseAdmin
       .from("jobs")
       .insert({
-        title: `[AVERÍA] ${data.machineName}: ${data.title}`,
+        title: `[AVERÍA] ${data.machineName}`,
         client: clientName,
         description: fullDescription,
         status: "pendiente",
@@ -375,7 +378,7 @@ export const submitAveria = createServerFn({ method: "POST" })
           elementos: data.elementos || [],
           machineId: data.machineId,
           machineName: data.machineName,
-          title: data.title,
+          title: finalTitle,
           description: data.description,
           urgency: data.urgency,
           clientId: userId,
@@ -682,4 +685,130 @@ export const deleteAveriaServer = createServerFn({ method: "POST" })
 
     await supabaseAdmin.from("jobs").delete().eq("id", data.id);
     return { ok: true };
+  });
+
+const GATEWAY = "https://connector-gateway.lovable.dev/google_mail/gmail/v1";
+const b64 = (s: string) => btoa(Array.from(new TextEncoder().encode(s), (b) => String.fromCharCode(b)).join(""));
+const hdr = (v: string) => (/^[\x00-\x7F]*$/.test(v) ? v : `=?UTF-8?B?${b64(v)}?=`);
+
+/**
+ * Envía el informe de avería resuelta por email (solo administradores).
+ */
+export const sendAveriaReportEmailServer = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        pdf: z.string().min(10).max(15_000_000),
+        recipientEmail: z.string().optional(),
+        clientName: z.string().optional(),
+        machineName: z.string().optional(),
+      })
+      .parse(d)
+  )
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Verificar admin
+    const { data: role } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", context.userId)
+      .eq("role", "admin")
+      .maybeSingle();
+    if (!role) throw new Error("Solo los administradores pueden enviar informes de averías por correo");
+
+    const [{ data: contacts }, { data: fixed }] = await Promise.all([
+      supabaseAdmin.from("report_contacts").select("name, email"),
+      supabaseAdmin.from("report_fixed_emails").select("email"),
+    ]);
+
+    const fixedEmailsList = (fixed ?? []).map((f: any) => f.email).filter(Boolean);
+    const allFixed = fixedEmailsList.flatMap((f: string) =>
+      f.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean)
+    );
+
+    let to: string[] = [];
+
+    if (data.recipientEmail && data.recipientEmail.trim()) {
+      to.push(data.recipientEmail.trim());
+    }
+
+    if (data.clientName) {
+      const c = contacts?.find(
+        (x: any) => x.name?.trim().toLowerCase() === data.clientName?.trim().toLowerCase()
+      );
+      if (c?.email) {
+        const clientEmails = (c.email as string)
+          .split(/[,;\s]+/)
+          .map((s) => s.trim())
+          .filter(Boolean);
+        to.push(...clientEmails);
+      }
+    }
+
+    to.push(...allFixed);
+    to = [...new Set(to)];
+
+    if (!to.length) {
+      throw new Error("No hay destinatarios de correo configurados para este cliente ni correos fijos.");
+    }
+
+    const key = process.env["LOVABLE_API_KEY"];
+    const conn = process.env["GOOGLE_MAIL_API_KEY"];
+    if (!key || !conn) {
+      throw new Error("Gmail no está conectado en el servidor.");
+    }
+
+    const machineStr = data.machineName || "Máquina";
+    const clientStr = data.clientName || "Cliente";
+    const boundary = "gruper" + crypto.randomUUID();
+    const filename = `Informe_Averia_${machineStr.replace(/[^a-zA-Z0-9_\-]/g, "_")}_${new Date().toISOString().slice(0, 10)}.pdf`;
+
+    const cleanBase64 = data.pdf.includes(",") ? data.pdf.split(",")[1] : data.pdf;
+    const formattedPdf = cleanBase64.replace(/(.{76})/g, "$1\r\n");
+
+    const subjectStr = `Informe de Avería Resuelta — ${machineStr} — ${clientStr} — Gruper`;
+    const bodyStr = `Hola,\n\nAdjuntamos el informe de avería resuelta correspondiente a la máquina "${machineStr}" del cliente ${clientStr}.\n\nEstado: Avería solucionada.\n\nAtentamente,\nGruper Remote`;
+
+    const mime = [
+      `To: ${to.join(", ")}`,
+      `Subject: ${hdr(subjectStr)}`,
+      "MIME-Version: 1.0",
+      `Content-Type: multipart/mixed; boundary="${boundary}"`,
+      "",
+      `--${boundary}`,
+      'Content-Type: text/plain; charset="UTF-8"',
+      "Content-Transfer-Encoding: base64",
+      "",
+      b64(bodyStr),
+      "",
+      `--${boundary}`,
+      `Content-Type: application/pdf; name="${filename}"`,
+      `Content-Disposition: attachment; filename="${filename}"`,
+      "Content-Transfer-Encoding: base64",
+      "",
+      formattedPdf,
+      `--${boundary}--`,
+    ].join("\r\n");
+
+    const raw = btoa(mime).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    const res = await fetch(`${GATEWAY}/users/me/messages/send`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "X-Connection-Api-Key": conn,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ raw }),
+    });
+
+    if (!res.ok) {
+      const t = await res.text();
+      console.error(`Gmail send failed [${res.status}]: ${t}`);
+      throw new Error(`No se pudo enviar el correo (${res.status})`);
+    }
+
+    return { ok: true, to };
   });

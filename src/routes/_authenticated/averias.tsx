@@ -22,9 +22,12 @@ import {
   ChevronDown,
   ChevronRight,
   UploadCloud,
-  Cpu,
   AlertCircle,
   Building,
+  FileText,
+  Download,
+  Mail,
+  Send,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,12 +38,17 @@ import {
   submitAveria,
   updateAveriaStatusServer,
   deleteAveriaServer,
+  sendAveriaReportEmailServer,
 } from "@/lib/averias.functions";
 import {
   getClientEquipmentForAveriasServer,
   getAllClientsAndEquipmentAdminServer,
 } from "@/lib/equipment.functions";
-import type { Averia, AveriaPhoto, AveriaElement } from "@/lib/averias";
+import {
+  downloadAveriaReportPdf,
+  getAveriaReportPdfBase64,
+} from "@/lib/averia-report-pdf";
+import type { Averia, AveriaPhoto } from "@/lib/averias";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -76,20 +84,22 @@ function AveriasPage() {
   const [filterStatus, setFilterStatus] = useState<"all" | "pendiente" | "en_curso" | "solucionado">("all");
   const [previewPhoto, setPreviewPhoto] = useState<AveriaPhoto | null>(null);
 
-  // Form states
+  // Form states (simplificado: sin título ni elementos fallidos por petición de usuario)
   const [selectedMachineId, setSelectedMachineId] = useState("");
   const [selectedMachineName, setSelectedMachineName] = useState("");
   const [manualMachineName, setManualMachineName] = useState("");
   const [adminClientTarget, setAdminClientTarget] = useState("");
-  const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [urgency, setUrgency] = useState<"normal" | "urgente">("normal");
   const [photos, setPhotos] = useState<AveriaPhoto[]>([]);
-  const [elementos, setElementos] = useState<AveriaElement[]>([]);
-  const [newElNombre, setNewElNombre] = useState("");
-  const [newElDesc, setNewElDesc] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  // Estados para informe PDF y envío de email
+  const [generatingPdfId, setGeneratingPdfId] = useState<string | null>(null);
+  const [emailModalAveria, setEmailModalAveria] = useState<Averia | null>(null);
+  const [emailRecipient, setEmailRecipient] = useState("");
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
 
   // Camera & Gallery refs
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -102,6 +112,7 @@ function AveriasPage() {
   const submitFn = useServerFn(submitAveria);
   const updateStatusFn = useServerFn(updateAveriaStatusServer);
   const deleteFn = useServerFn(deleteAveriaServer);
+  const sendEmailFn = useServerFn(sendAveriaReportEmailServer);
   const getEquipmentForAveriasFn = useServerFn(getClientEquipmentForAveriasServer);
   const getAllClientsAdminFn = useServerFn(getAllClientsAndEquipmentAdminServer);
 
@@ -169,7 +180,7 @@ function AveriasPage() {
         });
       }
       setPhotos((prev) => [...prev, ...newPhotos]);
-      toast.success(`${newPhotos.length} foto(s) añadida(s) correctamente`);
+      toast.success(`${newPhotos.length} foto(s) añadida(s)`);
     } catch (err) {
       console.error("Error comprimiendo foto:", err);
       toast.error("Error al procesar la imagen");
@@ -184,43 +195,13 @@ function AveriasPage() {
     setPhotos((prev) => prev.filter((p) => p.id !== id));
   };
 
-  // Añadir un elemento que falla con su descripción
-  const handleAddElemento = () => {
-    if (!newElNombre.trim()) {
-      toast.error("Indica el nombre del elemento o pieza que falla (ej. Bomba, Sonda, Válvula)");
-      return;
-    }
-    if (!newElDesc.trim()) {
-      toast.error("Describe qué le ocurre a este elemento");
-      return;
-    }
-    setElementos((prev) => [
-      ...prev,
-      {
-        id: `el-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        nombre: newElNombre.trim(),
-        descripcion: newElDesc.trim(),
-      },
-    ]);
-    setNewElNombre("");
-    setNewElDesc("");
-  };
-
-  const handleRemoveElemento = (id: string) => {
-    setElementos((prev) => prev.filter((el) => el.id !== id));
-  };
-
-  // Envío del formulario de avería
+  // Envío del formulario de avería limpio y sin campos innecesarios
   const handleSubmitAveria = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const machineNameFinal = selectedMachineName.trim() || manualMachineName.trim();
     if (!machineNameFinal) {
-      toast.error("Por favor, selecciona o indica la máquina afectada");
-      return;
-    }
-    if (!title.trim()) {
-      toast.error("Por favor, introduce un título o síntoma del fallo");
+      toast.error("Por favor, selecciona o escribe la máquina afectada");
       return;
     }
     if (!description.trim()) {
@@ -232,13 +213,14 @@ function AveriasPage() {
     try {
       const result = await submitFn({
         data: {
+          clientName: isAdmin && adminClientTarget ? adminClientTarget : undefined,
           machineId: selectedMachineId,
           machineName: machineNameFinal,
-          title: title.trim(),
+          title: machineNameFinal,
           description: description.trim(),
           urgency,
           photos,
-          elementos,
+          elementos: [],
         },
       });
 
@@ -254,7 +236,6 @@ function AveriasPage() {
                 id: result.id,
                 clientName: result.clientName,
                 machineName: result.machineName,
-                title: result.title,
                 urgency: result.urgency,
               },
             });
@@ -270,7 +251,6 @@ function AveriasPage() {
       });
 
       // Limpiar formulario y cerrar modal
-      setTitle("");
       setDescription("");
       setSelectedMachineId("");
       setSelectedMachineName("");
@@ -278,7 +258,6 @@ function AveriasPage() {
       setAdminClientTarget("");
       setUrgency("normal");
       setPhotos([]);
-      setElementos([]);
       setOpenModal(false);
 
       qc.invalidateQueries({ queryKey: ["averias"] });
@@ -311,15 +290,71 @@ function AveriasPage() {
           statusNote: note,
         },
       });
-      toast.success(
-        `Estado actualizado a: ${
-          newStatus === "solucionado" ? "Solucionado" : newStatus === "en_curso" ? "En curso" : "Pendiente"
-        }`
-      );
+
+      if (newStatus === "solucionado") {
+        toast.success("Avería marcada como solucionada. ¡Informe PDF listo para descargar o enviar por email!");
+      } else {
+        toast.success(
+          `Estado actualizado a: ${newStatus === "en_curso" ? "En curso" : "Pendiente"}`
+        );
+      }
+
       qc.invalidateQueries({ queryKey: ["averias"] });
       qc.invalidateQueries({ queryKey: ["jobs"] });
     } catch (err: any) {
       toast.error(err?.message || "Error al actualizar el estado");
+    }
+  };
+
+  // Descargar PDF del informe de avería resuelta
+  const handleDownloadPdf = async (averia: Averia) => {
+    setGeneratingPdfId(averia.id);
+    try {
+      toast.info("Generando informe PDF de avería...");
+      await downloadAveriaReportPdf(averia);
+      toast.success("Informe PDF descargado correctamente");
+    } catch (err: any) {
+      console.error("Error al descargar PDF:", err);
+      toast.error(err?.message || "Error al generar el informe PDF");
+    } finally {
+      setGeneratingPdfId(null);
+    }
+  };
+
+  // Abrir diálogo para enviar por email
+  const handleOpenEmailDialog = (averia: Averia) => {
+    setEmailModalAveria(averia);
+    setEmailRecipient("");
+  };
+
+  // Enviar informe por correo
+  const handleSendEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!emailModalAveria) return;
+
+    setIsSendingEmail(true);
+    try {
+      toast.info("Generando PDF y enviando correo...");
+      const pdfBase64 = await getAveriaReportPdfBase64(emailModalAveria);
+
+      const res = await sendEmailFn({
+        data: {
+          id: emailModalAveria.id,
+          pdf: pdfBase64,
+          recipientEmail: emailRecipient.trim() || undefined,
+          clientName: emailModalAveria.clientName,
+          machineName: emailModalAveria.machineName,
+        },
+      });
+
+      toast.success(`Informe enviado por email correctamente a: ${res.to.join(", ")}`);
+      setEmailModalAveria(null);
+      setEmailRecipient("");
+    } catch (err: any) {
+      console.error("Error enviando email:", err);
+      toast.error(err?.message || "No se pudo enviar el correo");
+    } finally {
+      setIsSendingEmail(false);
     }
   };
 
@@ -344,12 +379,9 @@ function AveriasPage() {
       const term = search.toLowerCase();
       const matchMachine = item.machineName.toLowerCase().includes(term);
       const matchClient = item.clientName.toLowerCase().includes(term);
-      const matchTitle = item.title.toLowerCase().includes(term);
+      const matchTitle = (item.title || "").toLowerCase().includes(term);
       const matchDesc = item.description.toLowerCase().includes(term);
-      const matchElements = (item.elementos || []).some(
-        (el) => el.nombre.toLowerCase().includes(term) || el.descripcion.toLowerCase().includes(term)
-      );
-      if (!matchMachine && !matchClient && !matchTitle && !matchDesc && !matchElements) return false;
+      if (!matchMachine && !matchClient && !matchTitle && !matchDesc) return false;
     }
 
     return true;
@@ -463,17 +495,19 @@ function AveriasPage() {
             </div>
           </div>
 
-          {/* Título y Descripción del fallo */}
-          <div className="mt-3.5 space-y-1.5">
-            <h3 className="font-semibold text-base text-foreground leading-snug">
-              {item.title}
-            </h3>
+          {/* Descripción del problema */}
+          <div className="mt-3.5 space-y-1">
+            {item.title && item.title !== item.machineName && !item.title.startsWith("[AVERÍA]") && (
+              <h3 className="font-semibold text-sm text-foreground leading-snug">
+                {item.title}
+              </h3>
+            )}
             <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">
               {item.description}
             </p>
           </div>
 
-          {/* Elementos específicos que fallan */}
+          {/* Elementos afectados históricos si existían */}
           {item.elementos && item.elementos.length > 0 && (
             <div className="mt-3.5 p-3 rounded-xl bg-muted/30 border border-border/80 space-y-1.5 text-xs">
               <span className="font-bold text-primary flex items-center gap-1.5 uppercase text-[10px] tracking-wider">
@@ -503,7 +537,7 @@ function AveriasPage() {
                     key={photo.id || pIdx}
                     type="button"
                     onClick={() => setPreviewPhoto(photo)}
-                    className="relative group rounded-lg overflow-hidden border border-border h-16 w-16 bg-muted shrink-0 transition-transform hover:scale-105 active:scale-95"
+                    className="relative group rounded-lg overflow-hidden border border-border h-16 w-16 bg-muted shrink-0 transition-transform hover:scale-105 active:scale-95 cursor-pointer"
                   >
                     <img
                       src={photo.url}
@@ -529,6 +563,48 @@ function AveriasPage() {
               </div>
             </div>
           )}
+
+          {/* Botones de Descargar PDF y Enviar por Mail cuando está Solucionada (solo Administrador) */}
+          {isSolved && isAdmin && (
+            <div className="mt-3.5 pt-3 border-t border-border/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-primary/[0.04] p-3 rounded-xl border border-primary/20">
+              <div className="flex items-center gap-2 min-w-0">
+                <FileText className="h-4 w-4 text-primary shrink-0" />
+                <div className="min-w-0">
+                  <span className="text-xs font-semibold text-foreground block truncate">
+                    Informe de avería resuelta
+                  </span>
+                  <span className="text-[11px] text-muted-foreground block truncate">
+                    PDF oficial con datos, fotos y notas
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  size="sm"
+                  onClick={() => handleDownloadPdf(item)}
+                  disabled={generatingPdfId === item.id}
+                  className="h-8 text-xs rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold gap-1.5 shadow-2xs cursor-pointer"
+                >
+                  {generatingPdfId === item.id ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Download className="h-3.5 w-3.5" />
+                  )}
+                  <span>Descargar PDF</span>
+                </Button>
+
+                <Button
+                  size="sm"
+                  onClick={() => handleOpenEmailDialog(item)}
+                  className="h-8 text-xs rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold gap-1.5 shadow-2xs cursor-pointer"
+                >
+                  <Mail className="h-3.5 w-3.5" />
+                  <span>Enviar por mail</span>
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Acciones de gestión con botones todos en azul Gruper uniforme */}
@@ -539,7 +615,7 @@ function AveriasPage() {
                 <Button
                   size="sm"
                   onClick={() => handleUpdateStatus(item, "en_curso")}
-                  className="h-8 text-xs rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold gap-1"
+                  className="h-8 text-xs rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold gap-1 cursor-pointer"
                 >
                   <Wrench className="h-3.5 w-3.5" /> Marcar en curso
                 </Button>
@@ -549,7 +625,7 @@ function AveriasPage() {
                 <Button
                   size="sm"
                   onClick={() => handleUpdateStatus(item, "solucionado")}
-                  className="h-8 text-xs rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold gap-1"
+                  className="h-8 text-xs rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold gap-1 cursor-pointer"
                 >
                   <CheckCircle2 className="h-3.5 w-3.5" /> Marcar solucionada
                 </Button>
@@ -560,7 +636,7 @@ function AveriasPage() {
                   size="sm"
                   variant="outline"
                   onClick={() => handleUpdateStatus(item, "pendiente")}
-                  className="h-8 text-xs rounded-xl border-border/80 text-foreground hover:border-primary/50 hover:text-primary gap-1"
+                  className="h-8 text-xs rounded-xl border-border/80 text-foreground hover:border-primary/50 hover:text-primary gap-1 cursor-pointer"
                 >
                   <Clock className="h-3.5 w-3.5 text-primary" /> Reabrir avería
                 </Button>
@@ -572,7 +648,7 @@ function AveriasPage() {
                 size="sm"
                 variant="ghost"
                 onClick={() => handleDelete(item.id)}
-                className="h-8 px-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                className="h-8 px-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 cursor-pointer"
                 aria-label="Eliminar avería"
               >
                 <Trash2 className="h-4 w-4" />
@@ -609,30 +685,30 @@ function AveriasPage() {
             </div>
             <p className="text-muted-foreground text-sm mt-1">
               {isAdmin
-                ? "Gestión de incidencias y avisos reportados por clientes con fotos y seguimiento"
+                ? "Gestión de incidencias reportadas por clientes con fotos, seguimiento e informes PDF"
                 : "Notifica cualquier problema en tus máquinas con fotos de la cámara para resolverlo de inmediato"}
             </p>
           </div>
 
           <Dialog open={openModal} onOpenChange={setOpenModal}>
             <DialogTrigger asChild>
-              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs gap-2 h-10 px-4 rounded-xl font-semibold active:scale-95 transition-all">
+              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs gap-2 h-10 px-4 rounded-xl font-semibold active:scale-95 transition-all cursor-pointer">
                 <Plus className="h-5 w-5" />
                 <span className="font-semibold">Dar aviso de avería</span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="w-[calc(100%-2rem)] sm:w-full max-w-lg max-h-[86vh] p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-border bg-card shadow-2xl overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2 text-xl font-bold text-foreground">
+            <DialogContent className="w-[calc(100vw-24px)] sm:w-full max-w-lg max-h-[90vh] p-4 sm:p-6 rounded-2xl border border-border bg-card shadow-2xl overflow-y-auto overflow-x-hidden my-auto">
+              <DialogHeader className="pr-8">
+                <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl font-bold text-foreground">
                   <Wrench className="h-5 w-5 text-primary" /> Notificar avería en máquina
                 </DialogTitle>
               </DialogHeader>
 
-              <form onSubmit={handleSubmitAveria} className="space-y-4 pt-2 pb-4">
+              <form onSubmit={handleSubmitAveria} className="space-y-4 pt-2 pb-2">
                 {/* Si es Admin: selector de Cliente */}
                 {isAdmin && (
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex flex-wrap items-center justify-between gap-1">
                       <span className="flex items-center gap-1.5">
                         <Building className="h-3.5 w-3.5 text-primary" />
                         <span>Cliente que reporta *</span>
@@ -662,7 +738,7 @@ function AveriasPage() {
                         setSelectedMachineId("");
                         setManualMachineName("");
                       }}
-                      className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary font-medium text-foreground cursor-pointer"
+                      className="w-full max-w-full h-11 rounded-xl border border-input bg-background px-3 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-primary font-medium text-foreground cursor-pointer"
                       required
                     >
                       <option value="">-- Elige un cliente para ver sus máquinas --</option>
@@ -681,13 +757,13 @@ function AveriasPage() {
                     <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Máquina afectada *
                     </label>
-                    <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 p-3.5 text-center text-xs text-muted-foreground">
-                      👆 Selecciona primero un cliente arriba para ver sus máquinas de Equipos.
+                    <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 p-3 text-center text-xs text-muted-foreground">
+                      👆 Selecciona primero un cliente arriba para ver sus máquinas asignadas.
                     </div>
                   </div>
                 ) : (
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex flex-wrap items-center justify-between gap-1">
                       <span>Máquina afectada *</span>
                       <span className="text-[11px] text-primary lowercase font-normal">
                         {assignedMachines.length} {assignedMachines.length === 1 ? "máquina en equipos" : "máquinas en equipos"}
@@ -696,7 +772,7 @@ function AveriasPage() {
 
                     {assignedMachines.length > 0 ? (
                       <select
-                        className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary font-medium text-foreground cursor-pointer"
+                        className="w-full max-w-full h-11 rounded-xl border border-input bg-background px-3 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-primary font-medium text-foreground cursor-pointer"
                         value={selectedMachineName}
                         onChange={(e) => {
                           const val = e.target.value;
@@ -714,15 +790,15 @@ function AveriasPage() {
                         ))}
                       </select>
                     ) : (
-                      <div className="space-y-2">
+                      <div className="space-y-1.5">
                         <Input
-                          placeholder="Nombre de la máquina (ej. Depuradora mtar-300a)"
+                          placeholder="Nombre de máquina (ej. Depuradora mtar-300a)"
                           value={manualMachineName}
                           onChange={(e) => setManualMachineName(e.target.value)}
                           required
-                          className="h-10 text-sm font-medium rounded-xl"
+                          className="h-10 text-xs sm:text-sm font-medium rounded-xl w-full max-w-full"
                         />
-                        <p className="text-[11px] text-muted-foreground">
+                        <p className="text-[11px] text-muted-foreground leading-tight">
                           {isAdmin
                             ? `"${adminClientTarget}" no tiene máquinas asignadas en Equipos. Escribe el nombre o puedes asignarle una en Administración > Equipos.`
                             : "No tienes máquinas registradas aún en el sistema. Escribe el nombre o modelo de tu máquina."}
@@ -741,126 +817,44 @@ function AveriasPage() {
                     <button
                       type="button"
                       onClick={() => setUrgency("normal")}
-                      className={`p-3 rounded-xl border text-left transition-all ${
+                      className={`p-2.5 sm:p-3 rounded-xl border text-left transition-all cursor-pointer ${
                         urgency === "normal"
                           ? "border-primary bg-primary/10 ring-1 ring-primary font-medium text-foreground"
                           : "border-border text-muted-foreground hover:bg-muted"
                       }`}
                     >
-                      <div className="font-semibold text-sm">Normal</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">La producción no está detenida</div>
+                      <div className="font-semibold text-xs sm:text-sm">Normal</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight">Producción activa</div>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => setUrgency("urgente")}
-                      className={`p-3 rounded-xl border text-left transition-all ${
+                      className={`p-2.5 sm:p-3 rounded-xl border text-left transition-all cursor-pointer ${
                         urgency === "urgente"
                           ? "border-primary bg-primary/10 ring-1 ring-primary font-medium text-foreground"
                           : "border-border text-muted-foreground hover:bg-muted"
                       }`}
                     >
-                      <div className="flex items-center gap-1.5 font-semibold text-sm text-foreground">
-                        <span>⚠️ URGENTE</span>
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-0.5">Máquina parada / Producción afectada</div>
+                      <div className="font-semibold text-xs sm:text-sm text-foreground">⚠️ URGENTE</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight">Máquina parada</div>
                     </button>
                   </div>
                 </div>
 
-                {/* Título breve */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Título o síntoma del fallo *
-                  </label>
-                  <Input
-                    placeholder="Ej. Bomba no arranca, Error E-04 en pantalla, Ruido extraño..."
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    required
-                    maxLength={100}
-                    className="h-10 font-medium rounded-xl"
-                  />
-                </div>
-
-                {/* Descripción detallada */}
+                {/* Descripción detallada del problema (solo descripción, sin título ni elementos) */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Descripción detallada del problema *
                   </label>
                   <Textarea
-                    placeholder="Describe con el mayor detalle posible qué ocurre, si huele a quemado, códigos de error en display, qué estabais haciendo cuando ocurrió..."
+                    placeholder="Describe con el mayor detalle posible qué ocurre, si huele a quemado, códigos de error en pantalla, ruidos extraños, qué estabais haciendo..."
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     required
-                    rows={3}
-                    className="text-sm rounded-xl"
+                    rows={4}
+                    className="text-xs sm:text-sm rounded-xl w-full max-w-full"
                   />
-                </div>
-
-                {/* Descripción de cada elemento que falla */}
-                <div className="space-y-2 pt-2 border-t border-border/60">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                      <Wrench className="h-3.5 w-3.5 text-primary" />
-                      <span>Elementos o componentes que fallan</span>
-                    </label>
-                    <span className="text-xs text-muted-foreground">{elementos.length} añadidos</span>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    Añade los elementos específicos afectados y describe qué le ocurre a cada uno (ej. Bomba, Sonda, Válvula...).
-                  </p>
-
-                  <div className="rounded-xl border border-border/80 bg-muted/20 p-3 space-y-2">
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <Input
-                        placeholder="Elemento que falla (ej. Bomba dosificadora)"
-                        value={newElNombre}
-                        onChange={(e) => setNewElNombre(e.target.value)}
-                        className="h-9 text-xs font-medium bg-background"
-                      />
-                      <Input
-                        placeholder="Descripción del fallo (ej. Gotea y no arranca)"
-                        value={newElDesc}
-                        onChange={(e) => setNewElDesc(e.target.value)}
-                        className="h-9 text-xs bg-background"
-                      />
-                    </div>
-                    <Button
-                      type="button"
-                      onClick={handleAddElemento}
-                      size="sm"
-                      className="w-full h-8 text-xs font-semibold gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      <span>Añadir este elemento al aviso</span>
-                    </Button>
-                  </div>
-
-                  {elementos.length > 0 && (
-                    <div className="space-y-1.5 pt-1">
-                      {elementos.map((el) => (
-                        <div
-                          key={el.id}
-                          className="rounded-lg border border-border bg-card p-2 flex items-center justify-between gap-2 text-xs"
-                        >
-                          <div className="min-w-0">
-                            <strong className="text-foreground">{el.nombre}:</strong>{" "}
-                            <span className="text-muted-foreground">{el.descripcion}</span>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleRemoveElemento(el.id)}
-                            className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
 
                 {/* Fotos con la Cámara del móvil o subida de galería */}
@@ -895,20 +889,20 @@ function AveriasPage() {
                     onChange={handlePhotoUpload}
                   />
 
-                  {/* Botones todos en el mismo azul Gruper */}
-                  <div className="flex items-center gap-2">
+                  {/* Botones todos en el mismo azul Gruper uniforme */}
+                  <div className="grid grid-cols-2 gap-2">
                     <Button
                       type="button"
                       onClick={() => cameraInputRef.current?.click()}
                       disabled={uploadingPhoto}
-                      className="flex-1 h-10 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs gap-1.5 active:scale-95 transition-all"
+                      className="h-10 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs gap-1.5 active:scale-95 transition-all cursor-pointer"
                     >
                       {uploadingPhoto ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
                         <Camera className="h-4 w-4" />
                       )}
-                      <span>Hacer foto con la cámara</span>
+                      <span className="truncate">Hacer foto con cámara</span>
                     </Button>
 
                     <Button
@@ -916,10 +910,10 @@ function AveriasPage() {
                       variant="outline"
                       onClick={() => galleryInputRef.current?.click()}
                       disabled={uploadingPhoto}
-                      className="flex-1 h-10 rounded-xl border-border/80 text-foreground hover:border-primary/50 hover:text-primary font-semibold text-xs gap-1.5 active:scale-95 transition-all"
+                      className="h-10 rounded-xl border-border/80 text-foreground hover:border-primary/50 hover:text-primary font-semibold text-xs gap-1.5 active:scale-95 transition-all cursor-pointer"
                     >
                       <UploadCloud className="h-4 w-4 text-primary" />
-                      <span>Subir de galería</span>
+                      <span className="truncate">Subir de galería</span>
                     </Button>
                   </div>
 
@@ -939,7 +933,7 @@ function AveriasPage() {
                           <button
                             type="button"
                             onClick={() => removePhoto(p.id)}
-                            className="absolute top-1 right-1 p-1 bg-black/60 text-white rounded-full shadow-md opacity-90 hover:opacity-100"
+                            className="absolute top-1 right-1 p-1 bg-black/60 text-white rounded-full shadow-md opacity-90 hover:opacity-100 cursor-pointer"
                             aria-label="Eliminar foto"
                           >
                             <X className="h-3.5 w-3.5" />
@@ -951,11 +945,11 @@ function AveriasPage() {
                 </div>
 
                 {/* Botón de envío limpio en azul corporativo */}
-                <div className="pt-3">
+                <div className="pt-2">
                   <Button
                     type="submit"
                     disabled={submitting}
-                    className="w-full h-11 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm shadow-xs active:scale-95 transition-all"
+                    className="w-full h-11 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm shadow-xs active:scale-95 transition-all cursor-pointer"
                   >
                     {submitting ? (
                       <>
@@ -980,7 +974,7 @@ function AveriasPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar por máquina, cliente, fallo o elemento..."
+              placeholder="Buscar por máquina, cliente o descripción..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9 h-10 rounded-xl bg-background border-border text-sm"
@@ -988,7 +982,7 @@ function AveriasPage() {
             {search && (
               <button
                 onClick={() => setSearch("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -1000,7 +994,7 @@ function AveriasPage() {
             size="sm"
             onClick={() => averiasQuery.refetch()}
             disabled={averiasQuery.isFetching}
-            className="shrink-0 h-10 rounded-xl border-border/80 text-xs gap-1.5"
+            className="shrink-0 h-10 rounded-xl border-border/80 text-xs gap-1.5 cursor-pointer"
           >
             <RefreshCw className={`h-4 w-4 ${averiasQuery.isFetching ? "animate-spin" : ""}`} />
             <span>Actualizar</span>
@@ -1012,7 +1006,7 @@ function AveriasPage() {
           <button
             type="button"
             onClick={() => setFilterStatus("all")}
-            className={`px-3 py-1.5 rounded-xl font-medium transition-colors ${
+            className={`px-3 py-1.5 rounded-xl font-medium transition-colors cursor-pointer ${
               filterStatus === "all"
                 ? "bg-primary text-primary-foreground shadow-xs font-semibold"
                 : "bg-muted/70 text-muted-foreground hover:bg-muted"
@@ -1023,7 +1017,7 @@ function AveriasPage() {
           <button
             type="button"
             onClick={() => setFilterStatus("pendiente")}
-            className={`px-3 py-1.5 rounded-xl font-medium transition-colors flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl font-medium transition-colors flex items-center gap-1.5 cursor-pointer ${
               filterStatus === "pendiente"
                 ? "bg-primary text-primary-foreground shadow-xs font-semibold"
                 : "bg-muted/70 text-muted-foreground hover:bg-muted"
@@ -1035,7 +1029,7 @@ function AveriasPage() {
           <button
             type="button"
             onClick={() => setFilterStatus("en_curso")}
-            className={`px-3 py-1.5 rounded-xl font-medium transition-colors flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl font-medium transition-colors flex items-center gap-1.5 cursor-pointer ${
               filterStatus === "en_curso"
                 ? "bg-primary text-primary-foreground shadow-xs font-semibold"
                 : "bg-muted/70 text-muted-foreground hover:bg-muted"
@@ -1047,7 +1041,7 @@ function AveriasPage() {
           <button
             type="button"
             onClick={() => setFilterStatus("solucionado")}
-            className={`px-3 py-1.5 rounded-xl font-medium transition-colors flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl font-medium transition-colors flex items-center gap-1.5 cursor-pointer ${
               filterStatus === "solucionado"
                 ? "bg-primary text-primary-foreground shadow-xs font-semibold"
                 : "bg-muted/70 text-muted-foreground hover:bg-muted"
@@ -1080,7 +1074,7 @@ function AveriasPage() {
             {!search && filterStatus === "all" && (
               <Button
                 onClick={() => setOpenModal(true)}
-                className="mt-4 bg-primary hover:bg-primary/90 text-primary-foreground gap-2 rounded-xl"
+                className="mt-4 bg-primary hover:bg-primary/90 text-primary-foreground gap-2 rounded-xl cursor-pointer"
               >
                 <Plus className="h-4 w-4" /> Dar primer aviso de avería
               </Button>
@@ -1183,7 +1177,7 @@ function AveriasPage() {
               <button
                 type="button"
                 onClick={() => setPreviewPhoto(null)}
-                className="absolute top-2 right-2 p-2 bg-black/60 rounded-full text-white hover:bg-black/90 z-10"
+                className="absolute top-2 right-2 p-2 bg-black/60 rounded-full text-white hover:bg-black/90 z-10 cursor-pointer"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -1198,6 +1192,81 @@ function AveriasPage() {
                 </p>
               )}
             </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal para enviar informe de avería resuelta por email (Administrador) */}
+      <Dialog open={!!emailModalAveria} onOpenChange={(open) => !open && setEmailModalAveria(null)}>
+        <DialogContent className="w-[calc(100vw-24px)] sm:w-full max-w-md p-4 sm:p-6 rounded-2xl border border-border bg-card shadow-2xl">
+          <DialogHeader className="pr-8">
+            <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl font-bold text-foreground">
+              <Mail className="h-5 w-5 text-primary" /> Enviar informe por email
+            </DialogTitle>
+          </DialogHeader>
+
+          {emailModalAveria && (
+            <form onSubmit={handleSendEmail} className="space-y-4 pt-2">
+              <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-1 text-xs">
+                <div>
+                  <strong className="text-foreground">Cliente:</strong>{" "}
+                  <span className="text-muted-foreground">{emailModalAveria.clientName}</span>
+                </div>
+                <div>
+                  <strong className="text-foreground">Máquina afectada:</strong>{" "}
+                  <span className="text-muted-foreground">{emailModalAveria.machineName}</span>
+                </div>
+                <div>
+                  <strong className="text-foreground">Fecha del aviso:</strong>{" "}
+                  <span className="text-muted-foreground">
+                    {new Date(emailModalAveria.createdAt).toLocaleDateString("es-ES")}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Email destinatario (opcional)
+                </label>
+                <Input
+                  type="email"
+                  placeholder="ej. cliente@empresa.com"
+                  value={emailRecipient}
+                  onChange={(e) => setEmailRecipient(e.target.value)}
+                  className="h-10 text-xs sm:text-sm rounded-xl"
+                />
+                <p className="text-[11px] text-muted-foreground leading-tight">
+                  Si lo dejas vacío, se enviará a los correos guardados del cliente y a los correos de administración de Gruper.
+                </p>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEmailModalAveria(null)}
+                  disabled={isSendingEmail}
+                  className="h-10 rounded-xl text-xs font-semibold cursor-pointer"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isSendingEmail}
+                  className="h-10 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold gap-1.5 shadow-2xs cursor-pointer"
+                >
+                  {isSendingEmail ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" /> Enviando informe...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4" /> Enviar informe ahora
+                    </>
+                  )}
+                </Button>
+              </div>
+            </form>
           )}
         </DialogContent>
       </Dialog>
