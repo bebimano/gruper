@@ -26,10 +26,13 @@ export function useClientEquipment(clientName?: string) {
         .order("client_name")
         .order("tipo_maquina");
       if (clientName) q = (q as any).eq("client_name", clientName);
-      else q = (q as any).neq("client_name", "__GRUPER_VEHICULOS__");
       const { data, error } = await q;
       if (error) throw error;
-      return (data ?? []) as ClientEquipmentRow[];
+      // Filtrar siempre registros internos del sistema (permisos, alertas, vehículos, metadatos)
+      const list = ((data ?? []) as ClientEquipmentRow[]).filter(
+        (r) => !r.client_name.startsWith("__") && !r.client_name.startsWith("AVERIA_")
+      );
+      return list;
     },
   });
 }
@@ -87,10 +90,10 @@ export function ClientEquipmentAdmin() {
     else qc.invalidateQueries({ queryKey: ["client-equipment"] });
   }
 
-  // Group by client_name
+  // Group by client_name (excluyendo cualquier registro interno del sistema)
   const grouped: Record<string, ClientEquipmentRow[]> = {};
   for (const row of all.data ?? []) {
-    if (row.client_name === "__GRUPER_VEHICULOS__") continue;
+    if (row.client_name.startsWith("__") || row.client_name.startsWith("AVERIA_")) continue;
     if (!grouped[row.client_name]) grouped[row.client_name] = [];
     grouped[row.client_name].push(row);
   }
