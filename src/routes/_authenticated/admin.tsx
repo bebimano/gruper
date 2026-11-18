@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { createUserAccount, deleteClientUser, resetClientPassword, setUserRole } from "@/lib/users.functions";
 import { useMe } from "@/lib/useRole";
-import { fetchAveriasAllowedUserIds, toggleClientAveriasPermission } from "@/lib/averias";
+import { getAllAllowedAveriasClients, setClientAveriasAccess } from "@/lib/averias.functions";
 import logo from "@/assets/gruper-logo.png.asset.json";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -336,6 +336,8 @@ function ClientsAdmin({ myId }: { myId: string }) {
   const deleteFn = useServerFn(deleteClientUser);
   const resetFn = useServerFn(resetClientPassword);
   const setRoleFn = useServerFn(setUserRole);
+  const setAveriasFn = useServerFn(setClientAveriasAccess);
+  const getAllAllowedFn = useServerFn(getAllAllowedAveriasClients);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [newRole, setNewRole] = useState<"admin" | "client">("client");
@@ -343,12 +345,13 @@ function ClientsAdmin({ myId }: { myId: string }) {
   const clients = useQuery({
     queryKey: ["admin-clients"],
     queryFn: async () => {
-      const [{ data: profiles }, { data: access }, { data: roles }, allowedAverias] = await Promise.all([
+      const [{ data: profiles }, { data: access }, { data: roles }, allowedAveriasList] = await Promise.all([
         supabase.from("profiles").select("*").order("username"),
         supabase.from("machine_access").select("user_id, machine_id"),
         supabase.from("user_roles").select("user_id, role"),
-        fetchAveriasAllowedUserIds(),
+        getAllAllowedFn().catch(() => []),
       ]);
+      const allowedAverias = new Set(allowedAveriasList ?? []);
       const roleMap = new Map((roles ?? []).map((r) => [r.user_id, r.role]));
       return (profiles ?? []).filter((p) => p.id !== myId).map((p) => {
         const item = p as any;
@@ -366,7 +369,7 @@ function ClientsAdmin({ myId }: { myId: string }) {
 
   async function toggleAverias(id: string, on: boolean) {
     try {
-      await toggleClientAveriasPermission(id, on);
+      await setAveriasFn({ data: { userId: id, allow: on } });
       toast.success(on ? "Acceso a Averías / Fallos activado" : "Acceso a Averías / Fallos desactivado");
       qc.invalidateQueries({ queryKey: ["admin-clients"] });
       qc.invalidateQueries({ queryKey: ["me"] });

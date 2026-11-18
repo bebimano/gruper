@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useState, useRef } from "react";
 import {
   ArrowLeft,
@@ -24,13 +25,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMe } from "@/lib/useRole";
 import { compressImage } from "@/lib/image-compress";
 import {
-  fetchAveriasList,
-  createAveria,
-  updateAveriaStatus,
-  deleteAveria,
-  type Averia,
-  type AveriaPhoto,
-} from "@/lib/averias";
+  getAveriasList,
+  submitAveria,
+  updateAveriaStatusServer,
+  deleteAveriaServer,
+} from "@/lib/averias.functions";
+import type { Averia, AveriaPhoto } from "@/lib/averias";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -80,14 +80,16 @@ function AveriasPage() {
   const isAdmin = !!me.data?.isAdmin;
   const canAccess = isAdmin || !!me.data?.canAverias;
 
-  // Consulta de averías
+  const getAveriasFn = useServerFn(getAveriasList);
+  const submitFn = useServerFn(submitAveria);
+  const updateStatusFn = useServerFn(updateAveriaStatusServer);
+  const deleteFn = useServerFn(deleteAveriaServer);
+
+  // Consulta de averías usando función de servidor con supabaseAdmin
   const averiasQuery = useQuery({
-    queryKey: ["averias", me.data?.id, isAdmin],
+    queryKey: ["averias", me.data?.id],
     enabled: !!me.data && canAccess,
-    queryFn: async () => {
-      // Admin ve todas; el cliente solo las suyas
-      return fetchAveriasList(isAdmin ? undefined : me.data?.username);
-    },
+    queryFn: () => getAveriasFn(),
   });
 
   // Consulta de máquinas asignadas al usuario para el selector
@@ -136,7 +138,7 @@ function AveriasPage() {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         if (!file.type.startsWith("image/")) continue;
-        const compressedDataUrl = await compressImage(file, 1200, 1200, 0.75);
+        const compressedDataUrl = await compressImage(file, 900, 900, 0.65);
         newPhotos.push({
           id: `foto-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           url: compressedDataUrl,
@@ -158,7 +160,7 @@ function AveriasPage() {
     setPhotos((prev) => prev.filter((p) => p.id !== id));
   };
 
-  // Envío del formulario de avería
+  // Envío del formulario de avería con función de servidor y notificación inmediata
   const handleSubmitAveria = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -177,19 +179,37 @@ function AveriasPage() {
 
     setSubmitting(true);
     try {
-      await createAveria({
-        clientId: me.data?.id || "",
-        clientName: me.data?.username || "Cliente",
-        machineId: selectedMachineId,
-        machineName: selectedMachineName,
-        title: title.trim(),
-        description: description.trim(),
-        urgency,
-        photos,
+      const result = await submitFn({
+        data: {
+          machineId: selectedMachineId,
+          machineName: selectedMachineName,
+          title: title.trim(),
+          description: description.trim(),
+          urgency,
+          photos,
+        },
       });
 
+      // Emitir aviso por canal Realtime para activar sonido y ventana emergente de técnicos
+      try {
+        const channel = supabase.channel("gruper-averias-realtime");
+        await channel.send({
+          type: "broadcast",
+          event: "new_averia",
+          payload: {
+            id: result.id,
+            clientName: result.clientName,
+            machineName: result.machineName,
+            title: result.title,
+            urgency: result.urgency,
+          },
+        });
+      } catch (bcErr) {
+        console.warn("Realtime broadcast error:", bcErr);
+      }
+
       toast.success("¡Aviso de avería enviado a Gruper!", {
-        description: "El equipo técnico ha sido notificado y revisará la incidencia de inmediato.",
+        description: "El aviso se ha registrado y los técnicos han sido alertados con ventana emergente.",
         duration: 7000,
       });
 
@@ -204,9 +224,9 @@ function AveriasPage() {
 
       qc.invalidateQueries({ queryKey: ["averias"] });
       qc.invalidateQueries({ queryKey: ["jobs"] });
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error al crear avería:", err);
-      toast.error("No se pudo enviar el aviso de avería. Inténtalo de nuevo.");
+      toast.error(err?.message || "No se pudo enviar el aviso de avería. Inténtalo de nuevo.");
     } finally {
       setSubmitting(false);
     }
@@ -225,24 +245,34 @@ function AveriasPage() {
           ? prompt("Nota técnica (ej. Técnico Juan en camino / Repuesto pedido):", averia.statusNote || "") ?? undefined
           : "";
 
-      await updateAveriaStatus(averia.id, newStatus, note);
-      toast.success(`Estado actualizado a: ${newStatus === "solucionado" ? "Solucionado" : newStatus === "en_curso" ? "En curso" : "Pendiente"}`);
+      await updateStatusFn({
+        data: {
+          id: averia.id,
+          status: newStatus,
+          statusNote: note,
+        },
+      });
+      toast.success(
+        `Estado actualizado a: ${
+          newStatus === "solucionado" ? "Solucionado" : newStatus === "en_curso" ? "En curso" : "Pendiente"
+        }`
+      );
       qc.invalidateQueries({ queryKey: ["averias"] });
       qc.invalidateQueries({ queryKey: ["jobs"] });
-    } catch (err) {
-      toast.error("Error al actualizar el estado");
+    } catch (err: any) {
+      toast.error(err?.message || "Error al actualizar el estado");
     }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("¿Eliminar este aviso de avería?")) return;
     try {
-      await deleteAveria(id);
+      await deleteFn({ data: { id } });
       toast.success("Aviso eliminado");
       qc.invalidateQueries({ queryKey: ["averias"] });
       qc.invalidateQueries({ queryKey: ["jobs"] });
-    } catch (err) {
-      toast.error("Error al eliminar");
+    } catch (err: any) {
+      toast.error(err?.message || "Error al eliminar");
     }
   };
 

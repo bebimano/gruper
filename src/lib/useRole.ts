@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchAveriasAllowedUserIds } from "@/lib/averias";
+import { checkMyAveriasAccess } from "@/lib/averias.functions";
 
 export function useMe() {
   return useQuery({
@@ -8,14 +8,17 @@ export function useMe() {
     queryFn: async () => {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) return null;
-      const [{ data: roles }, { data: profile }, allowedAverias] = await Promise.all([
+      const [{ data: roles }, { data: profile }, averiasAccess] = await Promise.all([
         supabase.from("user_roles").select("role").eq("user_id", u.user.id),
         supabase.from("profiles").select("*").eq("id", u.user.id).maybeSingle(),
-        fetchAveriasAllowedUserIds(),
+        checkMyAveriasAccess().catch((err) => {
+          console.warn("Error comprobando acceso a averias:", err);
+          return { canAverias: false, isAdmin: false };
+        }),
       ]);
-      const isAdmin = !!roles?.some((r) => r.role === "admin");
+      const isAdmin = !!roles?.some((r) => r.role === "admin") || averiasAccess.isAdmin;
       const p = profile as any;
-      const canAverias = isAdmin || !!p?.can_averias || allowedAverias.has(u.user.id);
+      const canAverias = isAdmin || averiasAccess.canAverias || !!p?.can_averias;
 
       return {
         id: u.user.id,
