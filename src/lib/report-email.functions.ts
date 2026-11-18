@@ -41,16 +41,22 @@ export const sendReportEmail = createServerFn({ method: "POST" })
     ]);
 
     const fixedEmailsList = (fixed ?? []).map((f) => f.email).filter(Boolean);
+    const allFixed = fixedEmailsList.flatMap((f) =>
+      f.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean)
+    );
     let to: string[] = [];
 
     if (isTaller) {
       // Parte de taller: NO se envía al cliente, SOLO a correos fijos
-      to = [...new Set(fixedEmailsList)];
+      to = [...new Set(allFixed)];
       if (!to.length) throw new Error("No hay correos fijos configurados para enviar partes de taller");
     } else {
-      // Parte de trabajo normal: cliente + correos fijos
+      // Parte de trabajo normal: cliente (puede tener múltiples correos) + correos fijos
       const c = contacts?.find((x) => x.name.trim().toLowerCase() === cliente.toLowerCase());
-      to = [...new Set([c?.email, ...fixedEmailsList].filter(Boolean))] as string[];
+      const clientEmails = c?.email
+        ? c.email.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean)
+        : [];
+      to = [...new Set([...clientEmails, ...allFixed])];
       if (!to.length) throw new Error("No hay correos asociados a este cliente ni correos fijos");
     }
 
