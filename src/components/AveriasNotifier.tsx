@@ -67,9 +67,6 @@ export function AveriasNotifier() {
     qc.invalidateQueries({ queryKey: ["averias"] });
     qc.invalidateQueries({ queryKey: ["jobs"] });
 
-    if (alert.clientName && alert.clientName === myUsername) return;
-    if (!canReceiveAlerts) return;
-
     // 1. Mostrar Pop up modal
     setActiveAlert(alert);
 
@@ -81,7 +78,7 @@ export function AveriasNotifier() {
     toast.error(
       isUrgent ? "🚨 ¡AVERÍA URGENTE REPORTADA!" : "⚠️ Nueva avería de cliente",
       {
-        description: `${alert.clientName} ha reportado fallo en ${alert.machineName}: "${alert.title}"`,
+        description: `${alert.clientName ? `${alert.clientName}: ` : ""}Fallo en ${alert.machineName}: "${alert.title}"`,
         duration: 15000,
         action: {
           label: "Ver avería",
@@ -114,7 +111,16 @@ export function AveriasNotifier() {
   };
 
   useEffect(() => {
-    if (!canReceiveAlerts) return;
+    // Escuchar evento directo lanzado por JobNotifier o la página
+    const handleLocalAlert = (e: any) => {
+      if (e.detail) {
+        setActiveAlert(e.detail);
+        playBeepSound();
+      }
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("gruper:averia-alert", handleLocalAlert);
+    }
 
     // 1. Escuchar canal broadcast en tiempo real
     const broadcastChannel = supabase
@@ -172,6 +178,9 @@ export function AveriasNotifier() {
       .subscribe();
 
     return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("gruper:averia-alert", handleLocalAlert);
+      }
       supabase.removeChannel(broadcastChannel);
       supabase.removeChannel(jobsChannel);
     };

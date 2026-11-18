@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { ArrowLeft, Plus, Trash2, Wrench } from "lucide-react";
+import { ArrowLeft, ArrowRight, AlertTriangle, Plus, Trash2, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useMe } from "@/lib/useRole";
@@ -72,12 +72,39 @@ function Trabajos() {
   }
   const name = (id: string | null) => users.data?.find((u) => u.id === id)?.username ?? (id ? "Usuario" : "Sin asignar");
 
+  const allJobs = jobs.data ?? [];
+  const regularJobs = allJobs.filter((j) => !j.title?.startsWith("[AVERÍA]"));
+  const averiaJobs = allJobs.filter((j) => j.title?.startsWith("[AVERÍA]"));
+
   return (
     <main className="min-h-screen px-4 sm:px-6 md:px-8 safe-top safe-bottom max-w-5xl w-full mx-auto pb-12">
       <header className="py-3">
         <Link to="/maquinas" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Volver</Link>
       </header>
       <h1 className="mt-4 text-2xl sm:text-3xl font-bold">Trabajos</h1>
+
+      {averiaJobs.length > 0 && (
+        <div className="mt-5 rounded-2xl border-2 border-amber-500/40 bg-amber-500/10 p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs animate-in fade-in">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400">
+              <AlertTriangle className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="font-bold text-base text-foreground">
+                {averiaJobs.length} {averiaJobs.length === 1 ? "aviso de avería pendiente" : "avisos de averías pendientes"} de clientes
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Las averías reportadas por clientes con fotos y estados se gestionan en su sección dedicada.
+              </p>
+            </div>
+          </div>
+          <Button asChild className="bg-amber-600 hover:bg-amber-700 text-white font-medium shrink-0 self-stretch sm:self-auto shadow-xs">
+            <Link to="/averias">
+              Ver Averías / Fallos <ArrowRight className="h-4 w-4 ml-1.5" />
+            </Link>
+          </Button>
+        </div>
+      )}
 
       {isAdmin && (
         <form onSubmit={create} className="mt-5 rounded-xl border border-border bg-card p-4 sm:p-5 space-y-3.5 shadow-sm">
@@ -97,13 +124,13 @@ function Trabajos() {
         </form>
       )}
 
-      {jobs.data?.length === 0 && (
+      {regularJobs.length === 0 && (
         <div className="mt-8 rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground bg-card/50">
           No hay trabajos creados todavía.
         </div>
       )}
       <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {jobs.data?.map((j) => (
+        {regularJobs.map((j) => (
           <JobCard
             key={j.id}
             j={j}
@@ -122,6 +149,22 @@ type Job = { id: string; title: string; client: string; description: string; sta
 function JobCard({ j, admin, who, onStatus, onDelete }: { j: Job; admin: boolean; who: string; onStatus: (id: string, s: string, n: string) => void; onDelete: (id: string) => void }) {
   const [note, setNote] = useState(j.status_note);
   const st = statusInfo(j.status);
+
+  // Limpiar y formatear descripción humana para que NUNCA aparezca código JSON
+  const cleanDescription = (() => {
+    if (!j.description) return "";
+    const trimmed = j.description.trim();
+    if (trimmed.startsWith("{")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        return parsed.description || parsed.title || "";
+      } catch {
+        return trimmed;
+      }
+    }
+    return trimmed;
+  })();
+
   return (
     <div className="rounded-2xl border border-border bg-card p-4 sm:p-5 space-y-3.5 shadow-xs transition-all hover:border-primary/40">
       <div className="flex items-start justify-between gap-3">
@@ -134,9 +177,9 @@ function JobCard({ j, admin, who, onStatus, onDelete }: { j: Job; admin: boolean
             <p className="text-xs text-muted-foreground mt-0.5 break-words">
               {[j.client, admin ? who : null, new Date(j.updated_at).toLocaleString("es-ES")].filter(Boolean).join(" · ")}
             </p>
-            {j.description && (
+            {cleanDescription && (
               <p className="mt-2.5 text-sm text-foreground/90 whitespace-pre-wrap break-words rounded-lg bg-muted/40 p-2.5 border border-border/60">
-                {j.description}
+                {cleanDescription}
               </p>
             )}
           </div>

@@ -331,13 +331,13 @@ export const submitAveria = createServerFn({ method: "POST" })
     const statusNote =
       data.urgency === "urgente" ? "🚨 AVERÍA URGENTE REPORTADA" : "Aviso de avería recibido";
 
-    // Insertar en tabla jobs
+    // Insertar en tabla jobs con descripción limpia y legible (NUNCA JSON crudo)
     const { data: job, error: jobErr } = await supabaseAdmin
       .from("jobs")
       .insert({
         title: `[AVERÍA] ${data.machineName}: ${data.title}`,
         client: clientName,
-        description: JSON.stringify(payload),
+        description: data.description,
         status: "pendiente",
         status_note: statusNote,
       })
@@ -347,6 +347,29 @@ export const submitAveria = createServerFn({ method: "POST" })
     if (jobErr) {
       console.error("Error al registrar avería en jobs:", jobErr);
       throw new Error(`Error en base de datos: ${jobErr.message}`);
+    }
+
+    // Persistir metadatos completos (fotos, máquina, cliente) en client_equipment
+    try {
+      await supabaseAdmin.from("client_equipment").insert({
+        client_name: "AVERIA_METADATA",
+        modelo: job.id,
+        direccion: JSON.stringify({
+          photos: data.photos,
+          machineId: data.machineId,
+          machineName: data.machineName,
+          title: data.title,
+          description: data.description,
+          urgency: data.urgency,
+          clientId: userId,
+          clientName,
+        }),
+        poblacion: "Gruper",
+        tipo_maquina: "averia_meta",
+        num_serie: String(Date.now()),
+      });
+    } catch (metaErr) {
+      console.warn("Aviso: no se pudo guardar metadatos extendidos en client_equipment:", metaErr);
     }
 
     // Intentar también en tabla averias si existe
@@ -366,13 +389,19 @@ export const submitAveria = createServerFn({ method: "POST" })
     } catch {}
 
     // Enviar notificación Push al móvil (pantalla apagada / fuera de la app)
+    // Incluye: Todos los administradores + destinatarios de 'new_job' + destinatarios activados para averías
     try {
-      const [{ data: adminRoles }, { data: notifyRows }] = await Promise.all([
+      const [{ data: adminRoles }, { data: notifyRows }, { data: jobSettings }] = await Promise.all([
         supabaseAdmin.from("user_roles").select("user_id").eq("role", "admin"),
         supabaseAdmin
           .from("client_equipment")
           .select("modelo")
           .eq("client_name", NOTIFY_USERS_CLIENT_NAME),
+        supabaseAdmin
+          .from("notification_settings")
+          .select("recipients")
+          .eq("event", "new_job")
+          .maybeSingle(),
       ]);
 
       const recipientSet = new Set<string>();
@@ -382,8 +411,15 @@ export const submitAveria = createServerFn({ method: "POST" })
       for (const n of notifyRows ?? []) {
         if (n.modelo) recipientSet.add(n.modelo);
       }
-      // Excluir al remitente
-      recipientSet.delete(userId);
+      for (const r of jobSettings?.recipients ?? []) {
+        if (r) recipientSet.add(r);
+      }
+
+      // Si hay más de un receptor y el creador es admin testeando, o si es cliente:
+      // Excluir al cliente de su propia alerta pero no bloquear si el admin está probando
+      if (recipientSet.size > 1 && !adminRoles?.some((a) => a.user_id === userId)) {
+        recipientSet.delete(userId);
+      }
 
       const targetUserIds = Array.from(recipientSet);
       if (targetUserIds.length > 0) {
@@ -446,27 +482,99 @@ export const getAveriasList = createServerFn({ method: "POST" })
       q = q.eq("client", clientUsername);
     }
 
-    const { data: jobs, error } = await q;
+    const [{ data: jobs, error }, { data: metaRows }] = await Promise.all([
+      q,
+      supabaseAdmin
+        .from("client_equipment")
+        .select("modelo, direccion")
+        .eq("client_name", "AVERIA_METADATA"),
+    ]);
+
     if (error) {
       console.error("Error consultando averias desde jobs:", error);
       throw error;
     }
 
+    const metaMap = new Map<string, any>();
+    for (const m of metaRows ?? []) {
+      try {
+        if (m.modelo && m.direccion) {
+          metaMap.set(m.modelo, JSON.parse(m.direccion));
+        }
+      } catch {}
+    }
+
+    // Auto-sanear registros existentes que tengan JSON crudo guardado en la descripción
+    for (const j of jobs ?? []) {
+      if (j.description?.startsWith("{")) {
+        try {
+          const parsed = JSON.parse(j.description);
+          if (parsed?.description) {
+            supabaseAdmin
+              .from("jobs")
+              .update({ description: parsed.description })
+              .eq("id", j.id)
+              .then(() => {});
+
+            if (!metaMap.has(j.id)) {
+              const metaPayload = {
+                photos: parsed.photos || [],
+                machineId: parsed.machineId || "",
+                machineName: parsed.machineName || "",
+                title: parsed.title || "",
+                description: parsed.description || "",
+                urgency: parsed.urgency || "normal",
+                clientId: parsed.clientId || "",
+                clientName: parsed.clientName || j.client || "Cliente",
+              };
+              metaMap.set(j.id, metaPayload);
+              supabaseAdmin
+                .from("client_equipment")
+                .insert({
+                  client_name: "AVERIA_METADATA",
+                  modelo: j.id,
+                  direccion: JSON.stringify(metaPayload),
+                  poblacion: "Gruper",
+                  tipo_maquina: "averia_meta",
+                  num_serie: String(Date.now()),
+                })
+                .then(() => {});
+            }
+          }
+        } catch {}
+      }
+    }
+
     const averias = (jobs ?? []).map((j) => {
+      const meta = metaMap.get(j.id);
       let parsed: any = null;
       try {
-        if (j.description.startsWith("{")) {
+        if (j.description?.startsWith("{")) {
           parsed = JSON.parse(j.description);
         }
       } catch {}
 
       const machineName =
-        parsed?.machineName || j.title.replace(/^\[AVERÍA\]\s*/i, "").split(":")[0]?.trim() || "Máquina";
+        meta?.machineName ||
+        parsed?.machineName ||
+        j.title.replace(/^\[AVERÍA\]\s*/i, "").split(":")[0]?.trim() ||
+        "Máquina";
       const title =
-        parsed?.title || (j.title.includes(":") ? j.title.split(":").slice(1).join(":").trim() : j.title);
-      const description = parsed?.description || (parsed ? "" : j.description);
-      const photos = Array.isArray(parsed?.photos) ? parsed.photos : [];
-      const urgency = (parsed?.urgency || (j.status_note?.includes("URGENTE") ? "urgente" : "normal")) as
+        meta?.title ||
+        parsed?.title ||
+        (j.title.includes(":") ? j.title.split(":").slice(1).join(":").trim() : j.title);
+      const description =
+        meta?.description ||
+        parsed?.description ||
+        (parsed ? "" : j.description);
+      const photos = Array.isArray(meta?.photos)
+        ? meta.photos
+        : Array.isArray(parsed?.photos)
+        ? parsed.photos
+        : [];
+      const urgency = (meta?.urgency ||
+        parsed?.urgency ||
+        (j.status_note?.includes("URGENTE") ? "urgente" : "normal")) as
         | "normal"
         | "urgente";
       const status = (j.status === "terminado"
@@ -477,9 +585,9 @@ export const getAveriasList = createServerFn({ method: "POST" })
 
       return {
         id: j.id,
-        clientId: parsed?.clientId || "",
-        clientName: j.client || parsed?.clientName || "Cliente",
-        machineId: parsed?.machineId || "",
+        clientId: meta?.clientId || parsed?.clientId || "",
+        clientName: meta?.clientName || j.client || parsed?.clientName || "Cliente",
+        machineId: meta?.machineId || parsed?.machineId || "",
         machineName,
         title,
         description,

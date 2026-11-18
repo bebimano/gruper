@@ -197,19 +197,38 @@ function AveriasPage() {
       // Emitir aviso por canal Realtime para activar sonido y ventana emergente de técnicos
       try {
         const channel = supabase.channel("gruper-averias-realtime");
-        await channel.send({
-          type: "broadcast",
-          event: "new_averia",
-          payload: {
-            id: result.id,
-            clientName: result.clientName,
-            machineName: result.machineName,
-            title: result.title,
-            urgency: result.urgency,
-          },
+        channel.subscribe((status) => {
+          if (status === "SUBSCRIBED") {
+            channel.send({
+              type: "broadcast",
+              event: "new_averia",
+              payload: {
+                id: result.id,
+                clientName: result.clientName,
+                machineName: result.machineName,
+                title: result.title,
+                urgency: result.urgency,
+              },
+            });
+          }
         });
       } catch (bcErr) {
         console.warn("Realtime broadcast error:", bcErr);
+      }
+
+      // Notificar localmente por si es un administrador o usuario en la misma sesión
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("gruper:averia-alert", {
+            detail: {
+              id: result.id,
+              clientName: result.clientName,
+              machineName: result.machineName,
+              title: result.title,
+              urgency: result.urgency,
+            },
+          })
+        );
       }
 
       toast.success("¡Aviso de avería enviado a Gruper!", {
