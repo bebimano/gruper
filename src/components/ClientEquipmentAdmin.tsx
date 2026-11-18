@@ -26,6 +26,7 @@ export function useClientEquipment(clientName?: string) {
         .order("client_name")
         .order("tipo_maquina");
       if (clientName) q = (q as any).eq("client_name", clientName);
+      else q = (q as any).neq("client_name", "__GRUPER_VEHICULOS__");
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as ClientEquipmentRow[];
@@ -89,6 +90,7 @@ export function ClientEquipmentAdmin() {
   // Group by client_name
   const grouped: Record<string, ClientEquipmentRow[]> = {};
   for (const row of all.data ?? []) {
+    if (row.client_name === "__GRUPER_VEHICULOS__") continue;
     if (!grouped[row.client_name]) grouped[row.client_name] = [];
     grouped[row.client_name].push(row);
   }

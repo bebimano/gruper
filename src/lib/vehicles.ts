@@ -41,6 +41,8 @@ export function formatVehicleLabel(v?: Partial<Vehicle> | null): string {
   return name || mat || "";
 }
 
+const VEHICLES_SPECIAL_CLIENT = "__GRUPER_VEHICULOS__";
+
 /**
  * React hook to fetch all company vehicles with fallback to local cache.
  */
@@ -51,32 +53,54 @@ export function useVehicles() {
     queryKey: ["company-vehicles"],
     queryFn: async () => {
       const localList = getLocalVehicles();
+
+      // 1. Try querying native 'vehicles' table first (if created via migration)
       try {
-        const { data, error } = await supabase
+        const vRes = await supabase
           .from("vehicles")
           .select("id, name, matricula, created_at")
           .order("name");
 
-        if (error) {
-          console.warn("Could not fetch vehicles from Supabase, using local cache:", error.message);
-          return localList;
+        if (!vRes.error && vRes.data && vRes.data.length > 0) {
+          const list: Vehicle[] = vRes.data.map((row) => ({
+            id: row.id,
+            name: row.name,
+            matricula: row.matricula,
+            created_at: row.created_at,
+          }));
+          setLocalVehicles(list);
+          return list;
         }
-
-        const list: Vehicle[] = (data || []).map((row) => ({
-          id: row.id,
-          name: row.name,
-          matricula: row.matricula,
-          created_at: row.created_at,
-        }));
-
-        setLocalVehicles(list);
-        return list;
-      } catch (err) {
-        console.warn("Vehicles fetch error, using local fallback:", err);
-        return localList;
+      } catch {
+        // vehicles table might not exist
       }
+
+      // 2. Query persistent vehicles stored in existing client_equipment table
+      try {
+        const eqRes = await supabase
+          .from("client_equipment")
+          .select("id, modelo, num_serie, created_at")
+          .eq("client_name", VEHICLES_SPECIAL_CLIENT)
+          .order("modelo");
+
+        if (!eqRes.error && eqRes.data && eqRes.data.length > 0) {
+          const list: Vehicle[] = eqRes.data.map((row) => ({
+            id: row.id,
+            name: row.modelo,
+            matricula: row.num_serie,
+            created_at: row.created_at,
+          }));
+          setLocalVehicles(list);
+          return list;
+        }
+      } catch (err) {
+        console.warn("Could not query vehicles from client_equipment:", err);
+      }
+
+      // 3. Fallback to local cache if available
+      return localList;
     },
-    staleTime: 1000 * 60 * 5, // 5 min
+    staleTime: 1000 * 30, // 30 sec
   });
 
   return {
@@ -96,32 +120,61 @@ export async function addVehicle(name: string, matricula: string): Promise<Vehic
     throw new Error("El nombre y la matrícula son obligatorios.");
   }
 
-  const tempId = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Date.now());
-  const newVehicle: Vehicle = {
-    id: tempId,
-    name: cleanName,
-    matricula: cleanMat,
-    created_at: new Date().toISOString(),
-  };
+  let savedId: string | null = null;
+  let savedCreatedAt: string | null = null;
 
+  // 1. Try insert into 'vehicles' table
   try {
-    const { data, error } = await supabase
+    const vInsert = await supabase
       .from("vehicles")
       .insert({ name: cleanName, matricula: cleanMat })
       .select("id, name, matricula, created_at")
+      .maybeSingle();
+
+    if (!vInsert.error && vInsert.data) {
+      savedId = vInsert.data.id;
+      savedCreatedAt = vInsert.data.created_at;
+    }
+  } catch {
+    // ignore
+  }
+
+  // 2. Persist in client_equipment (always present in Supabase!)
+  if (!savedId) {
+    const eqInsert = await supabase
+      .from("client_equipment")
+      .insert({
+        client_name: VEHICLES_SPECIAL_CLIENT,
+        tipo_maquina: "Vehículo",
+        modelo: cleanName,
+        num_serie: cleanMat,
+        direccion: "",
+        poblacion: "",
+      })
+      .select("id, created_at")
       .single();
 
-    if (!error && data) {
-      newVehicle.id = data.id;
-      newVehicle.created_at = data.created_at;
+    if (eqInsert.error) {
+      console.error("Error inserting vehicle into Supabase:", eqInsert.error);
+      throw new Error(`Error al guardar en base de datos: ${eqInsert.error.message}`);
     }
-  } catch (err) {
-    console.warn("Supabase insert vehicle fallback to local:", err);
+
+    if (eqInsert.data) {
+      savedId = eqInsert.data.id;
+      savedCreatedAt = eqInsert.data.created_at;
+    }
   }
+
+  const newVehicle: Vehicle = {
+    id: savedId || (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
+    name: cleanName,
+    matricula: cleanMat,
+    created_at: savedCreatedAt || new Date().toISOString(),
+  };
 
   // Update local cache
   const current = getLocalVehicles();
-  const updated = [...current.filter((v) => v.id !== newVehicle.id), newVehicle].sort((a, b) =>
+  const updated = [...current.filter((v) => v.id !== newVehicle.id && v.matricula !== cleanMat), newVehicle].sort((a, b) =>
     a.name.localeCompare(b.name, "es-ES")
   );
   setLocalVehicles(updated);
@@ -139,13 +192,24 @@ export async function updateVehicle(id: string, name: string, matricula: string)
     throw new Error("El nombre y la matrícula son obligatorios.");
   }
 
+  // Try vehicles table
   try {
     await supabase
       .from("vehicles")
       .update({ name: cleanName, matricula: cleanMat })
       .eq("id", id);
+  } catch {
+    // ignore
+  }
+
+  // Update client_equipment table
+  try {
+    await supabase
+      .from("client_equipment")
+      .update({ modelo: cleanName, num_serie: cleanMat })
+      .eq("id", id);
   } catch (err) {
-    console.warn("Supabase update vehicle fallback to local:", err);
+    console.warn("Could not update vehicle in client_equipment:", err);
   }
 
   // Update local cache
@@ -158,10 +222,18 @@ export async function updateVehicle(id: string, name: string, matricula: string)
  * Delete a vehicle.
  */
 export async function deleteVehicle(id: string): Promise<void> {
+  // Try vehicles table
   try {
     await supabase.from("vehicles").delete().eq("id", id);
+  } catch {
+    // ignore
+  }
+
+  // Delete from client_equipment table
+  try {
+    await supabase.from("client_equipment").delete().eq("id", id);
   } catch (err) {
-    console.warn("Supabase delete vehicle fallback to local:", err);
+    console.warn("Could not delete vehicle from client_equipment:", err);
   }
 
   // Update local cache
