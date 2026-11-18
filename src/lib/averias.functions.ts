@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const PERMISOS_CLIENT_NAME = "__GRUPER_AVERIAS_PERMISOS__";
+const NOTIFY_USERS_CLIENT_NAME = "__GRUPER_AVERIAS_NOTIFY_USERS__";
 
 /**
  * Comprueba si el usuario autenticado actual tiene acceso al apartado de Averías / Fallos.
@@ -58,6 +59,41 @@ export const checkMyAveriasAccess = createServerFn({ method: "POST" })
     }
 
     return { canAverias: false, isAdmin: false };
+  });
+
+/**
+ * Comprueba si el usuario autenticado actual debe recibir avisos (pop-ups y push) de averías.
+ * Son los administradores + los trabajadores configurados expresamente.
+ */
+export const checkShouldReceiveAveriaAlert = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const userId = context.userId;
+
+    // Administradores siempre reciben avisos
+    const { data: roleData } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .eq("role", "admin")
+      .maybeSingle();
+
+    if (roleData) return { receiveAlerts: true };
+
+    // Comprobar si está en la lista de trabajadores con aviso
+    try {
+      const { data: record } = await supabaseAdmin
+        .from("client_equipment")
+        .select("id")
+        .eq("client_name", NOTIFY_USERS_CLIENT_NAME)
+        .eq("modelo", userId)
+        .maybeSingle();
+
+      if (record) return { receiveAlerts: true };
+    } catch {}
+
+    return { receiveAlerts: false };
   });
 
 /**
@@ -161,6 +197,87 @@ export const setClientAveriasAccess = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/**
+ * Obtiene los IDs de los trabajadores configurados para recibir alertas de averías.
+ */
+export const getAveriaNotifyRecipients = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const [{ data: adminRoles }, { data: records }] = await Promise.all([
+      supabaseAdmin.from("user_roles").select("user_id").eq("role", "admin"),
+      supabaseAdmin
+        .from("client_equipment")
+        .select("modelo")
+        .eq("client_name", NOTIFY_USERS_CLIENT_NAME),
+    ]);
+
+    const ids = new Set<string>();
+    for (const a of adminRoles ?? []) {
+      if (a.user_id) ids.add(a.user_id);
+    }
+    for (const r of records ?? []) {
+      if (r.modelo) ids.add(r.modelo);
+    }
+
+    return Array.from(ids);
+  });
+
+/**
+ * Concede o revoca la recepción de alertas de averías a un usuario/trabajador.
+ */
+export const setAveriaNotifyRecipient = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z
+      .object({
+        userId: z.string().uuid(),
+        enabled: z.boolean(),
+      })
+      .parse(d)
+  )
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Verificar admin
+    const { data: role } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", context.userId)
+      .eq("role", "admin")
+      .maybeSingle();
+    if (!role) throw new Error("No autorizado");
+
+    if (data.enabled) {
+      const { data: existing } = await supabaseAdmin
+        .from("client_equipment")
+        .select("id")
+        .eq("client_name", NOTIFY_USERS_CLIENT_NAME)
+        .eq("modelo", data.userId)
+        .maybeSingle();
+
+      if (!existing) {
+        await supabaseAdmin.from("client_equipment").insert({
+          client_name: NOTIFY_USERS_CLIENT_NAME,
+          modelo: data.userId,
+          direccion: "Alerta Averias",
+          poblacion: "Gruper",
+          tipo_maquina: "notify_recipient",
+          num_serie: String(Date.now()),
+        });
+      }
+    } else {
+      await supabaseAdmin
+        .from("client_equipment")
+        .delete()
+        .eq("client_name", NOTIFY_USERS_CLIENT_NAME)
+        .eq("modelo", data.userId);
+    }
+
+    return { ok: true };
+  });
+
 const photoSchema = z.object({
   id: z.string(),
   url: z.string(),
@@ -169,7 +286,8 @@ const photoSchema = z.object({
 
 /**
  * Registra un aviso de avería de cliente.
- * Se guarda en jobs con supabaseAdmin garantizando inserción sin bloqueos de RLS.
+ * Se guarda en jobs con supabaseAdmin garantizando inserción sin bloqueos de RLS,
+ * y envía notificaciones push al móvil para que suene con pantalla apagada.
  */
 export const submitAveria = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -246,6 +364,53 @@ export const submitAveria = createServerFn({ method: "POST" })
         status_note: "",
       });
     } catch {}
+
+    // Enviar notificación Push al móvil (pantalla apagada / fuera de la app)
+    try {
+      const [{ data: adminRoles }, { data: notifyRows }] = await Promise.all([
+        supabaseAdmin.from("user_roles").select("user_id").eq("role", "admin"),
+        supabaseAdmin
+          .from("client_equipment")
+          .select("modelo")
+          .eq("client_name", NOTIFY_USERS_CLIENT_NAME),
+      ]);
+
+      const recipientSet = new Set<string>();
+      for (const a of adminRoles ?? []) {
+        if (a.user_id) recipientSet.add(a.user_id);
+      }
+      for (const n of notifyRows ?? []) {
+        if (n.modelo) recipientSet.add(n.modelo);
+      }
+      // Excluir al remitente
+      recipientSet.delete(userId);
+
+      const targetUserIds = Array.from(recipientSet);
+      if (targetUserIds.length > 0) {
+        const { data: toks } = await supabaseAdmin
+          .from("push_tokens")
+          .select("token")
+          .in("user_id", targetUserIds);
+
+        const tokens = (toks ?? []).map((t) => t.token);
+        if (tokens.length > 0) {
+          const { sendPush } = await import("@/lib/push.server");
+          const isUrgent = data.urgency === "urgente";
+          const pushTitle = isUrgent
+            ? `🚨 ¡AVERÍA URGENTE: ${data.machineName}!`
+            : `⚠️ Avería: ${data.machineName}`;
+          const pushBody = `${clientName}: ${data.title}`;
+          const pushLink = "/averias";
+
+          const dead = await sendPush(tokens, pushTitle, pushBody, pushLink);
+          if (dead.length) {
+            await supabaseAdmin.from("push_tokens").delete().in("token", dead);
+          }
+        }
+      }
+    } catch (pushErr) {
+      console.error("Error enviando push notifications de avería:", pushErr);
+    }
 
     return { id: job.id, clientName, machineName: data.machineName, title: data.title, urgency: data.urgency };
   });

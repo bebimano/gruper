@@ -36,7 +36,32 @@ export async function sendPush(tokens: string[], title: string, body: string, li
     const res = await fetch(`https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`, {
       method: "POST",
       headers: { Authorization: `Bearer ${at}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ message: { token, notification: { title, body }, data: { link }, apns: { payload: { aps: { sound: "default" } } } } }),
+      body: JSON.stringify({
+        message: {
+          token,
+          notification: { title, body },
+          data: { link, title, body },
+          android: {
+            priority: "high",
+            notification: {
+              sound: "default",
+              default_sound: true,
+              default_vibrate_timings: true,
+              notification_priority: "PRIORITY_MAX",
+              visibility: "PUBLIC",
+            },
+          },
+          apns: {
+            payload: {
+              aps: {
+                sound: "default",
+                badge: 1,
+                "content-available": 1,
+              },
+            },
+          },
+        },
+      }),
     });
     if (!res.ok) {
       const t = await res.text();

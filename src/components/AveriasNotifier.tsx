@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { AlertTriangle, ChevronRight, X, Wrench, ShieldAlert } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useMe } from "@/lib/useRole";
+import { checkShouldReceiveAveriaAlert } from "@/lib/averias.functions";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -49,9 +51,16 @@ export function AveriasNotifier() {
   const me = useMe();
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const isWorker = !!(me.data?.canReports || me.data?.isAdmin);
   const myUsername = me.data?.username;
 
+  const checkAlertFn = useServerFn(checkShouldReceiveAveriaAlert);
+  const { data: alertPerm } = useQuery({
+    queryKey: ["averia-alert-perm", me.data?.id],
+    enabled: !!me.data?.id,
+    queryFn: () => checkAlertFn(),
+  });
+
+  const canReceiveAlerts = !!(me.data?.isAdmin || alertPerm?.receiveAlerts);
   const [activeAlert, setActiveAlert] = useState<AveriaAlert | null>(null);
 
   const triggerAlert = (alert: AveriaAlert) => {
@@ -59,6 +68,7 @@ export function AveriasNotifier() {
     qc.invalidateQueries({ queryKey: ["jobs"] });
 
     if (alert.clientName && alert.clientName === myUsername) return;
+    if (!canReceiveAlerts) return;
 
     // 1. Mostrar Pop up modal
     setActiveAlert(alert);
@@ -104,7 +114,7 @@ export function AveriasNotifier() {
   };
 
   useEffect(() => {
-    if (!isWorker) return;
+    if (!canReceiveAlerts) return;
 
     // 1. Escuchar canal broadcast en tiempo real
     const broadcastChannel = supabase
@@ -165,7 +175,7 @@ export function AveriasNotifier() {
       supabase.removeChannel(broadcastChannel);
       supabase.removeChannel(jobsChannel);
     };
-  }, [isWorker, myUsername]);
+  }, [canReceiveAlerts, myUsername]);
 
   if (!activeAlert) return null;
 

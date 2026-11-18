@@ -2,13 +2,18 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { ArrowLeft, Trash2, KeyRound, FileText, RefreshCw, Shield, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Trash2, KeyRound, FileText, RefreshCw, Shield, AlertTriangle, Bell } from "lucide-react";
 import { checkMachinesStatus } from "@/lib/machines.functions";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { createUserAccount, deleteClientUser, resetClientPassword, setUserRole } from "@/lib/users.functions";
 import { useMe } from "@/lib/useRole";
-import { getAllAllowedAveriasClients, setClientAveriasAccess } from "@/lib/averias.functions";
+import {
+  getAllAllowedAveriasClients,
+  setClientAveriasAccess,
+  getAveriaNotifyRecipients,
+  setAveriaNotifyRecipient,
+} from "@/lib/averias.functions";
 import logo from "@/assets/gruper-logo.png.asset.json";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -338,6 +343,8 @@ function ClientsAdmin({ myId }: { myId: string }) {
   const setRoleFn = useServerFn(setUserRole);
   const setAveriasFn = useServerFn(setClientAveriasAccess);
   const getAllAllowedFn = useServerFn(getAllAllowedAveriasClients);
+  const getAveriaRecipientsFn = useServerFn(getAveriaNotifyRecipients);
+  const setAveriaRecipientFn = useServerFn(setAveriaNotifyRecipient);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [newRole, setNewRole] = useState<"admin" | "client">("client");
@@ -345,22 +352,26 @@ function ClientsAdmin({ myId }: { myId: string }) {
   const clients = useQuery({
     queryKey: ["admin-clients"],
     queryFn: async () => {
-      const [{ data: profiles }, { data: access }, { data: roles }, allowedAveriasList] = await Promise.all([
+      const [{ data: profiles }, { data: access }, { data: roles }, allowedAveriasList, notifyRecipientsList] = await Promise.all([
         supabase.from("profiles").select("*").order("username"),
         supabase.from("machine_access").select("user_id, machine_id"),
         supabase.from("user_roles").select("user_id, role"),
         getAllAllowedFn().catch(() => []),
+        getAveriaRecipientsFn().catch(() => []),
       ]);
       const allowedAverias = new Set(allowedAveriasList ?? []);
+      const notifyRecipients = new Set(notifyRecipientsList ?? []);
       const roleMap = new Map((roles ?? []).map((r) => [r.user_id, r.role]));
       return (profiles ?? []).filter((p) => p.id !== myId).map((p) => {
         const item = p as any;
+        const isAdminUser = roleMap.get(item.id) === "admin";
         return {
           ...item,
           can_view_all_reports: !!item.can_view_all_reports,
           can_averias: !!item.can_averias || allowedAverias.has(item.id),
+          receives_averia_alerts: isAdminUser || notifyRecipients.has(item.id),
           role: (roleMap.get(item.id) as "admin" | "client") ?? "client",
-          isAdmin: roleMap.get(item.id) === "admin",
+          isAdmin: isAdminUser,
           machineIds: new Set((access ?? []).filter((a) => a.user_id === item.id).map((a) => a.machine_id)),
         };
       });
@@ -373,6 +384,16 @@ function ClientsAdmin({ myId }: { myId: string }) {
       toast.success(on ? "Acceso a Averías / Fallos activado" : "Acceso a Averías / Fallos desactivado");
       qc.invalidateQueries({ queryKey: ["admin-clients"] });
       qc.invalidateQueries({ queryKey: ["me"] });
+    } catch (e) {
+      err(e);
+    }
+  }
+
+  async function toggleAveriaAlerts(id: string, on: boolean) {
+    try {
+      await setAveriaRecipientFn({ data: { userId: id, enabled: on } });
+      toast.success(on ? "Avisos de avería activados para este usuario" : "Avisos de avería desactivados");
+      qc.invalidateQueries({ queryKey: ["admin-clients"] });
     } catch (e) {
       err(e);
     }
@@ -518,6 +539,16 @@ function ClientsAdmin({ myId }: { myId: string }) {
                   </div>
                 </div>
                 <Switch checked={c.can_averias} onCheckedChange={(v) => toggleAverias(c.id, v)} />
+              </label>
+              <label className="flex items-center justify-between rounded-lg bg-muted/60 px-3 py-2 text-sm">
+                <div className="flex items-center gap-2">
+                  <Bell className="h-4 w-4 text-primary" />
+                  <div>
+                    <span className="font-medium">Recibir avisos de averías de clientes</span>
+                    <span className="block text-xs text-muted-foreground">Ventana emergente y notificación push en el móvil (incluso con pantalla apagada)</span>
+                  </div>
+                </div>
+                <Switch checked={c.receives_averia_alerts} onCheckedChange={(v) => toggleAveriaAlerts(c.id, v)} />
               </label>
               {c.can_work_reports && (
                 <>

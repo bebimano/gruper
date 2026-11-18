@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import {
   ArrowLeft,
   Plus,
@@ -19,6 +19,10 @@ import {
   RefreshCw,
   MessageSquare,
   ShieldAlert,
+  Folder,
+  FolderOpen,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -296,6 +300,215 @@ function AveriasPage() {
   const countPendientes = rawList.filter((a) => a.status === "pendiente").length;
   const countEnCurso = rawList.filter((a) => a.status === "en_curso").length;
   const countSolucionadas = rawList.filter((a) => a.status === "solucionado").length;
+
+  // Agrupado por carpetas de cliente
+  const clientGroups = useMemo(() => {
+    const map = new Map<string, Averia[]>();
+    for (const a of filteredList) {
+      const c = (a.clientName || "Sin cliente").trim();
+      if (!map.has(c)) map.set(c, []);
+      map.get(c)!.push(a);
+    }
+    return Array.from(map.entries())
+      .map(([clientName, items]) => {
+        const pendingCount = items.filter((x) => x.status === "pendiente").length;
+        const urgentCount = items.filter((x) => x.urgency === "urgente" && x.status !== "solucionado").length;
+        return {
+          clientName,
+          items,
+          pendingCount,
+          urgentCount,
+        };
+      })
+      .sort((a, b) => a.clientName.localeCompare(b.clientName, "es-ES"));
+  }, [filteredList]);
+
+  const [collapsedFolders, setCollapsedFolders] = useState<Record<string, boolean>>({});
+
+  const toggleFolder = (key: string) => {
+    setCollapsedFolders((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
+
+  const collapseAll = () => {
+    const next: Record<string, boolean> = {};
+    for (const g of clientGroups) {
+      next[g.clientName] = true;
+    }
+    setCollapsedFolders(next);
+  };
+
+  const expandAll = () => {
+    setCollapsedFolders({});
+  };
+
+  const renderAveriaCard = (item: Averia) => {
+    const isPending = item.status === "pendiente";
+    const isInProgress = item.status === "en_curso";
+    const isSolved = item.status === "solucionado";
+    const isUrgent = item.urgency === "urgente";
+
+    return (
+      <div
+        key={item.id}
+        className={`rounded-2xl border p-4 sm:p-5 bg-card shadow-xs transition-all flex flex-col justify-between ${
+          isUrgent && isPending
+            ? "border-destructive/60 bg-destructive/5 ring-1 ring-destructive/20"
+            : isPending
+            ? "border-amber-500/40 bg-amber-500/[0.02]"
+            : isSolved
+            ? "border-border opacity-90"
+            : "border-blue-500/30"
+        }`}
+      >
+        <div>
+          {/* Top Header: Máquina, Urgencia, Estado */}
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="p-2 rounded-xl bg-primary/10 text-primary shrink-0">
+                <Monitor className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <span className="font-bold text-base block truncate text-foreground">
+                  {item.machineName}
+                </span>
+                <span className="text-xs text-muted-foreground block truncate">
+                  {isAdmin ? `Cliente: ${item.clientName} · ` : ""}
+                  {new Date(item.createdAt).toLocaleString("es-ES", {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  })}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-end gap-1 shrink-0">
+              {isUrgent && (
+                <Badge variant="destructive" className="animate-pulse font-bold text-[10px] uppercase">
+                  ⚠️ URGENTE
+                </Badge>
+              )}
+              <Badge
+                variant={isSolved ? "default" : isPending ? "outline" : "secondary"}
+                className={
+                  isPending
+                    ? "border-amber-500 text-amber-600 bg-amber-500/10 font-semibold"
+                    : isInProgress
+                    ? "bg-blue-600 text-white font-semibold"
+                    : "bg-green-600 text-white font-semibold"
+                }
+              >
+                {isPending ? "Pendiente" : isInProgress ? "En curso" : "Solucionada"}
+              </Badge>
+            </div>
+          </div>
+
+          {/* Título y Descripción del fallo */}
+          <div className="mt-3.5 space-y-1.5">
+            <h3 className="font-semibold text-base text-foreground leading-snug">
+              {item.title}
+            </h3>
+            <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">
+              {item.description}
+            </p>
+          </div>
+
+          {/* Galería de fotos adjuntas */}
+          {item.photos && item.photos.length > 0 && (
+            <div className="mt-4 pt-3 border-t border-border/60">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1">
+                <Camera className="h-3.5 w-3.5 text-amber-500" />
+                <span>Fotos adjuntas ({item.photos.length}):</span>
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {item.photos.map((photo, pIdx) => (
+                  <button
+                    key={photo.id || pIdx}
+                    type="button"
+                    onClick={() => setPreviewPhoto(photo)}
+                    className="relative group rounded-lg overflow-hidden border border-border h-16 w-16 bg-muted shrink-0 transition-transform hover:scale-105 active:scale-95"
+                  >
+                    <img
+                      src={photo.url}
+                      alt="Foto avería"
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity grid place-items-center text-white">
+                      <Eye className="h-4 w-4" />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Nota técnica o de resolución */}
+          {item.statusNote && (
+            <div className="mt-3.5 p-3 rounded-xl bg-muted/60 border border-border text-xs flex items-start gap-2">
+              <MessageSquare className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <span className="font-semibold text-foreground block">Nota del servicio técnico:</span>
+                <span className="text-muted-foreground">{item.statusNote}</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Acciones de gestión (para técnicos y administradores) */}
+        {(isAdmin || me.data?.canReports) && (
+          <div className="mt-4 pt-3 border-t border-border/60 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {isPending && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleUpdateStatus(item, "en_curso")}
+                  className="h-8 text-xs border-blue-500/50 text-blue-600 hover:bg-blue-500/10"
+                >
+                  <Wrench className="h-3.5 w-3.5 mr-1" /> Marcar en curso
+                </Button>
+              )}
+
+              {!isSolved && (
+                <Button
+                  size="sm"
+                  onClick={() => handleUpdateStatus(item, "solucionado")}
+                  className="h-8 text-xs bg-green-600 hover:bg-green-700 text-white"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Marcar solucionada
+                </Button>
+              )}
+
+              {isSolved && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleUpdateStatus(item, "pendiente")}
+                  className="h-8 text-xs text-amber-600 border-amber-500/40 hover:bg-amber-500/10"
+                >
+                  <Clock className="h-3.5 w-3.5 mr-1" /> Reabrir avería
+                </Button>
+              )}
+            </div>
+
+            {isAdmin && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => handleDelete(item.id)}
+                className="h-8 px-2 text-destructive hover:bg-destructive/10"
+                aria-label="Eliminar avería"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <main className="min-h-screen bg-hero px-4 sm:px-6 md:px-8 safe-top safe-bottom max-w-5xl w-full mx-auto pb-14">
@@ -637,173 +850,91 @@ function AveriasPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {filteredList.map((item) => {
-            const isPending = item.status === "pendiente";
-            const isInProgress = item.status === "en_curso";
-            const isSolved = item.status === "solucionado";
-            const isUrgent = item.urgency === "urgente";
+        {!averiasQuery.isLoading && clientGroups.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
+              <span className="font-medium">
+                {clientGroups.length} {clientGroups.length === 1 ? "carpeta de cliente" : "carpetas de clientes"}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={expandAll}
+                  className="hover:text-primary transition-colors font-medium cursor-pointer"
+                >
+                  Abrir todas
+                </button>
+                <span>·</span>
+                <button
+                  type="button"
+                  onClick={collapseAll}
+                  className="hover:text-primary transition-colors font-medium cursor-pointer"
+                >
+                  Plegar todas
+                </button>
+              </div>
+            </div>
 
-            return (
-              <div
-                key={item.id}
-                className={`rounded-2xl border p-4 sm:p-5 bg-card shadow-xs transition-all flex flex-col justify-between ${
-                  isUrgent && isPending
-                    ? "border-destructive/60 bg-destructive/5 ring-1 ring-destructive/20"
-                    : isPending
-                    ? "border-amber-500/40 bg-amber-500/[0.02]"
-                    : isSolved
-                    ? "border-border opacity-90"
-                    : "border-blue-500/30"
-                }`}
-              >
-                <div>
-                  {/* Top Header: Máquina, Urgencia, Estado */}
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="p-2 rounded-xl bg-primary/10 text-primary shrink-0">
-                        <Monitor className="h-5 w-5" />
-                      </span>
+            {clientGroups.map((g) => {
+              const isCollapsed = search.trim().length > 0 ? false : !!collapsedFolders[g.clientName];
+
+              return (
+                <div
+                  key={g.clientName}
+                  className="rounded-2xl border border-border bg-card/70 backdrop-blur shadow-xs overflow-hidden transition-all"
+                >
+                  {/* Encabezado Carpeta Cliente */}
+                  <button
+                    type="button"
+                    onClick={() => toggleFolder(g.clientName)}
+                    className="w-full flex items-center justify-between p-4 bg-muted/30 hover:bg-muted/60 transition-colors text-left cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                        {isCollapsed ? <Folder className="h-5 w-5" /> : <FolderOpen className="h-5 w-5" />}
+                      </div>
                       <div className="min-w-0">
-                        <span className="font-bold text-base block truncate text-foreground">
-                          {item.machineName}
+                        <span className="block font-semibold text-base truncate text-foreground">
+                          {g.clientName}
                         </span>
-                        <span className="text-xs text-muted-foreground block truncate">
-                          {isAdmin ? `Cliente: ${item.clientName} · ` : ""}
-                          {new Date(item.createdAt).toLocaleString("es-ES", {
-                            dateStyle: "medium",
-                            timeStyle: "short",
-                          })}
+                        <span className="block text-xs text-muted-foreground">
+                          {g.items.length} {g.items.length === 1 ? "avería guardada" : "averías guardadas"}
+                          {g.pendingCount > 0 ? ` · ${g.pendingCount} pendiente(s)` : " · al día"}
                         </span>
                       </div>
                     </div>
 
-                    <div className="flex flex-col items-end gap-1 shrink-0">
-                      {isUrgent && (
-                        <Badge variant="destructive" className="animate-pulse font-bold text-[10px] uppercase">
-                          ⚠️ URGENTE
+                    <div className="flex items-center gap-2 shrink-0 text-muted-foreground ml-3">
+                      {g.urgentCount > 0 && (
+                        <Badge variant="destructive" className="text-[10px] uppercase font-bold animate-pulse">
+                          ⚠️ {g.urgentCount} urgente
                         </Badge>
                       )}
-                      <Badge
-                        variant={isSolved ? "default" : isPending ? "outline" : "secondary"}
-                        className={
-                          isPending
-                            ? "border-amber-500 text-amber-600 bg-amber-500/10 font-semibold"
-                            : isInProgress
-                            ? "bg-blue-600 text-white font-semibold"
-                            : "bg-green-600 text-white font-semibold"
-                        }
-                      >
-                        {isPending ? "Pendiente" : isInProgress ? "En curso" : "Solucionada"}
-                      </Badge>
+                      {g.pendingCount > 0 && (
+                        <Badge variant="outline" className="border-amber-500 text-amber-600 bg-amber-500/10 text-xs font-semibold">
+                          {g.pendingCount} pendiente{g.pendingCount > 1 ? "s" : ""}
+                        </Badge>
+                      )}
+                      <span className="text-xs font-medium bg-background border border-border px-2.5 py-1 rounded-full">
+                        {g.items.length}
+                      </span>
+                      {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                     </div>
-                  </div>
+                  </button>
 
-                  {/* Título y Descripción del fallo */}
-                  <div className="mt-3.5 space-y-1.5">
-                    <h3 className="font-semibold text-base text-foreground leading-snug">
-                      {item.title}
-                    </h3>
-                    <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">
-                      {item.description}
-                    </p>
-                  </div>
-
-                  {/* Galería de fotos adjuntas */}
-                  {item.photos && item.photos.length > 0 && (
-                    <div className="mt-4 pt-3 border-t border-border/60">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1">
-                        <Camera className="h-3.5 w-3.5 text-amber-500" />
-                        <span>Fotos adjuntas ({item.photos.length}):</span>
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {item.photos.map((photo, pIdx) => (
-                          <button
-                            key={photo.id || pIdx}
-                            type="button"
-                            onClick={() => setPreviewPhoto(photo)}
-                            className="relative group rounded-lg overflow-hidden border border-border h-16 w-16 bg-muted shrink-0 transition-transform hover:scale-105 active:scale-95"
-                          >
-                            <img
-                              src={photo.url}
-                              alt="Foto avería"
-                              className="w-full h-full object-cover"
-                            />
-                            <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity grid place-items-center text-white">
-                              <Eye className="h-4 w-4" />
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Nota técnica o de resolución */}
-                  {item.statusNote && (
-                    <div className="mt-3.5 p-3 rounded-xl bg-muted/60 border border-border text-xs flex items-start gap-2">
-                      <MessageSquare className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                      <div className="flex-1">
-                        <span className="font-semibold text-foreground block">Nota del servicio técnico:</span>
-                        <span className="text-muted-foreground">{item.statusNote}</span>
+                  {/* Averías dentro de la carpeta */}
+                  {!isCollapsed && (
+                    <div className="p-4 border-t border-border/60 bg-background/50">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {g.items.map((item) => renderAveriaCard(item))}
                       </div>
                     </div>
                   )}
                 </div>
-
-                {/* Acciones de gestión (para técnicos y administradores) */}
-                {(isAdmin || me.data?.canReports) && (
-                  <div className="mt-4 pt-3 border-t border-border/60 flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {isPending && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleUpdateStatus(item, "en_curso")}
-                          className="h-8 text-xs border-blue-500/50 text-blue-600 hover:bg-blue-500/10"
-                        >
-                          <Wrench className="h-3.5 w-3.5 mr-1" /> Marcar en curso
-                        </Button>
-                      )}
-
-                      {!isSolved && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleUpdateStatus(item, "solucionado")}
-                          className="h-8 text-xs bg-green-600 hover:bg-green-700 text-white"
-                        >
-                          <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Marcar solucionada
-                        </Button>
-                      )}
-
-                      {isSolved && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleUpdateStatus(item, "pendiente")}
-                          className="h-8 text-xs text-amber-600 border-amber-500/40 hover:bg-amber-500/10"
-                        >
-                          <Clock className="h-3.5 w-3.5 mr-1" /> Reabrir avería
-                        </Button>
-                      )}
-                    </div>
-
-                    {isAdmin && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleDelete(item.id)}
-                        className="h-8 px-2 text-destructive hover:bg-destructive/10"
-                        aria-label="Eliminar avería"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Modal visor de foto a pantalla completa */}
