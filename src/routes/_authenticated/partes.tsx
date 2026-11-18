@@ -309,11 +309,12 @@ function Partes() {
       <header className="flex items-center justify-between py-3">
         <Link
           to="/maquinas"
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-card px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-foreground/90 shadow-2xs transition-all hover:bg-muted hover:border-primary/50 hover:text-primary active:scale-95"
         >
-          <ArrowLeft className="h-4 w-4" /> Volver
+          <ArrowLeft className="h-4 w-4 text-primary" />
+          <span>Volver a máquinas</span>
         </Link>
-        <Button asChild size="sm">
+        <Button asChild size="sm" className="rounded-xl shadow-xs font-semibold active:scale-95 transition-all">
           <Link to="/parte/$id" params={{ id: "nuevo" }}>
             <Plus className="h-4 w-4 mr-1" /> Nuevo parte
           </Link>

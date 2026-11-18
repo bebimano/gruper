@@ -22,19 +22,20 @@ function About() {
 
   return (
     <div className="fixed inset-0 flex flex-col bg-background">
-      <header className="flex items-center gap-2 px-3 pb-1 safe-top">
+      <header className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border/60 bg-card/60 backdrop-blur-md safe-top">
         <button
           onClick={() => router.history.back()}
           aria-label="Volver"
-          className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-sm text-muted-foreground hover:text-primary"
+          className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-background px-3 py-1.5 text-xs sm:text-sm font-semibold text-foreground/90 shadow-2xs transition-all hover:bg-muted hover:border-primary/50 hover:text-primary active:scale-95"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft className="h-4 w-4 text-primary" />
+          <span>Volver</span>
         </button>
-        <span className="flex-1 truncate text-center text-sm font-semibold">Sobre nosotros</span>
+        <span className="flex-1 truncate text-center text-sm sm:text-base font-bold text-foreground">Sobre nosotros</span>
         <button
           onClick={() => setKey((k) => k + 1)}
           aria-label="Recargar"
-          className="rounded-full p-1.5 text-muted-foreground hover:text-primary"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border/80 bg-background text-foreground/80 shadow-2xs transition-all hover:bg-muted hover:border-primary/50 hover:text-primary active:scale-95"
         >
           <RotateCw className="h-4 w-4" />
         </button>

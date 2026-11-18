@@ -348,11 +348,17 @@ function Parte() {
   return (
     <main className="min-h-screen px-4 sm:px-6 md:px-8 safe-top pb-32 max-w-4xl lg:max-w-5xl w-full mx-auto">
       <header className="flex items-center justify-between py-3 print:hidden">
-        <Link to="/partes" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Partes</Link>
-        <div className="flex gap-1">
-          <Button variant="ghost" size="icon" onClick={downloadPdf} disabled={downloading} aria-label="Descargar PDF" title="Descargar PDF"><Download className="h-4 w-4" /></Button>
-          <Button variant="ghost" size="icon" onClick={handlePrint} aria-label="Imprimir o PDF" title="Imprimir"><Printer className="h-4 w-4" /></Button>
-          {!isNew && (!closed || me.data?.isAdmin) && <Button variant="ghost" size="icon" onClick={remove} aria-label="Eliminar parte"><Trash2 className="h-4 w-4" /></Button>}
+        <Link
+          to="/partes"
+          className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-card px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-foreground/90 shadow-2xs transition-all hover:bg-muted hover:border-primary/50 hover:text-primary active:scale-95"
+        >
+          <ArrowLeft className="h-4 w-4 text-primary" />
+          <span>Volver a partes</span>
+        </Link>
+        <div className="flex gap-1.5">
+          <Button variant="outline" size="icon" onClick={downloadPdf} disabled={downloading} aria-label="Descargar PDF" title="Descargar PDF" className="rounded-xl border-border/80 bg-card h-9 w-9 shadow-2xs hover:border-primary/50 active:scale-95 transition-all"><Download className="h-4 w-4" /></Button>
+          <Button variant="outline" size="icon" onClick={handlePrint} aria-label="Imprimir o PDF" title="Imprimir" className="rounded-xl border-border/80 bg-card h-9 w-9 shadow-2xs hover:border-primary/50 active:scale-95 transition-all"><Printer className="h-4 w-4" /></Button>
+          {!isNew && (!closed || me.data?.isAdmin) && <Button variant="outline" size="icon" onClick={remove} aria-label="Eliminar parte" className="rounded-xl border-border/80 bg-card h-9 w-9 shadow-2xs text-destructive hover:bg-destructive/10 hover:border-destructive/40 active:scale-95 transition-all"><Trash2 className="h-4 w-4" /></Button>}
         </div>
       </header>
       <div className="mt-2 mb-6">

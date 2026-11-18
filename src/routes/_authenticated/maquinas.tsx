@@ -45,13 +45,27 @@ function Machines() {
     <main className="min-h-screen bg-hero px-4 sm:px-6 md:px-8 safe-top safe-bottom flex flex-col max-w-5xl w-full mx-auto pb-10">
       <header className="flex items-center justify-between py-3">
         <img src={logo.url} alt="Gruper" width={1076} height={343} className="h-9 sm:h-11 w-auto" />
-        <div className="flex gap-1">
+        <div className="flex gap-2">
           {me.data?.isAdmin && (
-            <Button variant="ghost" size="icon" asChild aria-label="Administración">
-              <Link to="/admin"><Settings /></Link>
+            <Button
+              variant="outline"
+              size="icon"
+              asChild
+              aria-label="Administración"
+              className="rounded-xl border-border/80 bg-card h-9 w-9 shadow-2xs hover:border-primary/50 hover:bg-muted active:scale-95 transition-all"
+            >
+              <Link to="/admin"><Settings className="h-4 w-4 text-foreground/80" /></Link>
             </Button>
           )}
-          <Button variant="ghost" size="icon" onClick={logout} aria-label="Cerrar sesión"><LogOut /></Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={logout}
+            aria-label="Cerrar sesión"
+            className="rounded-xl border-border/80 bg-card h-9 w-9 shadow-2xs hover:border-destructive/40 hover:text-destructive hover:bg-destructive/10 active:scale-95 transition-all text-muted-foreground"
+          >
+            <LogOut className="h-4 w-4" />
+          </Button>
         </div>
       </header>
       <div className="mt-4 sm:mt-6">

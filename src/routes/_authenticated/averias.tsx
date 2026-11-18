@@ -122,9 +122,9 @@ function AveriasPage() {
         <p className="text-sm text-muted-foreground mb-6">
           Tu cuenta no tiene activado el acceso al apartado de Averías / Fallos. Contacta con Gruper para habilitar este servicio para tus máquinas.
         </p>
-        <Button asChild variant="outline">
+        <Button asChild variant="outline" className="rounded-xl border-border/80 shadow-2xs">
           <Link to="/maquinas">
-            <ArrowLeft className="h-4 w-4 mr-2" /> Volver a mis máquinas
+            <ArrowLeft className="h-4 w-4 mr-2 text-primary" /> Volver a mis máquinas
           </Link>
         </Button>
       </main>
@@ -537,9 +537,10 @@ function AveriasPage() {
           <img src={logo.url} alt="Gruper" width={1076} height={343} className="h-8 sm:h-9 w-auto" />
           <Link
             to="/maquinas"
-            className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
+            className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-card px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-foreground/90 shadow-2xs transition-all hover:bg-muted hover:border-primary/50 hover:text-primary active:scale-95"
           >
-            <ArrowLeft className="h-4 w-4" /> Volver a máquinas
+            <ArrowLeft className="h-4 w-4 text-primary" />
+            <span>Volver a máquinas</span>
           </Link>
         </div>
 
@@ -560,7 +561,7 @@ function AveriasPage() {
 
           <Dialog open={openModal} onOpenChange={setOpenModal}>
             <DialogTrigger asChild>
-              <Button className="bg-amber-600 hover:bg-amber-700 text-white shadow-md gap-2 h-11 px-5">
+              <Button className="bg-amber-600 hover:bg-amber-700 text-white shadow-xs gap-2 h-10 px-4 rounded-xl font-semibold active:scale-95 transition-all">
                 <Plus className="h-5 w-5" />
                 <span className="font-semibold">Dar aviso de avería</span>
               </Button>

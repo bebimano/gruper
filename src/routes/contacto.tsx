@@ -47,7 +47,7 @@ function Contact() {
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col bg-background px-5 safe-top safe-bottom">
       <header className="flex items-center gap-3 py-3">
-        <Button variant="ghost" size="icon" aria-label="Volver" onClick={back} className="shrink-0 text-muted-foreground"><ArrowLeft className="size-4" /></Button>
+        <Button variant="outline" size="icon" aria-label="Volver" onClick={back} className="shrink-0 rounded-xl border-border/80 bg-card h-9 w-9 shadow-2xs hover:border-primary/50 active:scale-95 transition-all text-foreground/80"><ArrowLeft className="h-4 w-4 text-primary" /></Button>
         <img src={logo.url} alt="Gruper" width={1076} height={343} className="h-9 w-auto max-w-[65%] object-contain" />
       </header>
       <section className="mx-auto w-full max-w-md py-6">

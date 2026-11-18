@@ -79,7 +79,13 @@ function Trabajos() {
   return (
     <main className="min-h-screen px-4 sm:px-6 md:px-8 safe-top safe-bottom max-w-5xl w-full mx-auto pb-12">
       <header className="py-3">
-        <Link to="/maquinas" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Volver</Link>
+        <Link
+          to="/maquinas"
+          className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-card px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-foreground/90 shadow-2xs transition-all hover:bg-muted hover:border-primary/50 hover:text-primary active:scale-95"
+        >
+          <ArrowLeft className="h-4 w-4 text-primary" />
+          <span>Volver a máquinas</span>
+        </Link>
       </header>
       <h1 className="mt-4 text-2xl sm:text-3xl font-bold">Trabajos</h1>
 
@@ -119,7 +125,7 @@ function Trabajos() {
               <option value="">Asignar a…</option>
               {users.data?.map((u) => <option key={u.id} value={u.id}>{u.username}</option>)}
             </select>
-            <Button type="submit"><Plus /> Crear trabajo</Button>
+            <Button type="submit" className="rounded-xl font-semibold shadow-xs active:scale-95 transition-all gap-1.5"><Plus className="h-4 w-4" /> Crear trabajo</Button>
           </div>
         </form>
       )}
