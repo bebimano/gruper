@@ -621,86 +621,116 @@ function AveriasPage() {
                 <span className="font-semibold">Dar aviso de avería</span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogContent className="w-[calc(100%-2rem)] sm:w-full max-w-lg max-h-[86vh] p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-border bg-card shadow-2xl overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2 text-xl font-bold text-foreground">
                   <Wrench className="h-5 w-5 text-primary" /> Notificar avería en máquina
                 </DialogTitle>
               </DialogHeader>
 
-              <form onSubmit={handleSubmitAveria} className="space-y-4 pt-2">
-                {/* Si es Admin: selector de Cliente opcional */}
+              <form onSubmit={handleSubmitAveria} className="space-y-4 pt-2 pb-4">
+                {/* Si es Admin: selector de Cliente */}
                 {isAdmin && (
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                      <Building className="h-3.5 w-3.5 text-primary" />
-                      <span>Cliente que reporta (Administrador)</span>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Building className="h-3.5 w-3.5 text-primary" />
+                        <span>Cliente que reporta *</span>
+                      </span>
+                      {adminClientTarget && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAdminClientTarget("");
+                            setSelectedMachineName("");
+                            setSelectedMachineId("");
+                            setManualMachineName("");
+                          }}
+                          className="text-[11px] text-primary hover:underline font-normal cursor-pointer"
+                        >
+                          Cambiar cliente
+                        </button>
+                      )}
                     </label>
-                    <Input
-                      list="averias-admin-client-list"
-                      placeholder="Selecciona o escribe el cliente (ej. Cañamas Alcudia)"
+
+                    <select
                       value={adminClientTarget}
                       onChange={(e) => {
-                        setAdminClientTarget(e.target.value);
+                        const val = e.target.value;
+                        setAdminClientTarget(val);
                         setSelectedMachineName("");
+                        setSelectedMachineId("");
+                        setManualMachineName("");
                       }}
-                      className="h-10 text-sm font-medium"
-                    />
-                    <datalist id="averias-admin-client-list">
+                      className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary font-medium text-foreground cursor-pointer"
+                      required
+                    >
+                      <option value="">-- Elige un cliente para ver sus máquinas --</option>
                       {adminClientsQuery.data?.clients.map((c) => (
                         <option key={c.name} value={c.name}>
-                          {c.name} ({c.machinesCount} máquinas en Equipos)
+                          {c.name} {c.machinesCount > 0 ? `(${c.machinesCount} ${c.machinesCount === 1 ? "máquina" : "máquinas"})` : "(0 máquinas)"}
                         </option>
                       ))}
-                    </datalist>
+                    </select>
                   </div>
                 )}
 
                 {/* Selector de máquina desde EQUIPOS (client_equipment) */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-                    <span>Máquina afectada *</span>
-                    <span className="text-[11px] text-primary lowercase font-normal">
-                      {assignedMachines.length} máquina(s) en equipos
-                    </span>
-                  </label>
-
-                  {assignedMachines.length > 0 ? (
-                    <select
-                      className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary font-medium"
-                      value={selectedMachineName}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setSelectedMachineName(val);
-                        const m = assignedMachines.find((x) => x.displayName === val);
-                        if (m) setSelectedMachineId(m.id);
-                      }}
-                      required
-                    >
-                      <option value="">-- Elige la máquina que tiene la avería --</option>
-                      {assignedMachines.map((m) => (
-                        <option key={m.id} value={m.displayName}>
-                          {m.displayName}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <div className="space-y-2">
-                      <Input
-                        placeholder="Nombre de la máquina (ej. Depuradora mtar-300a)"
-                        value={manualMachineName}
-                        onChange={(e) => setManualMachineName(e.target.value)}
-                        required
-                        className="h-10 text-sm font-medium"
-                      />
-                      <p className="text-[11px] text-muted-foreground">
-                        {isAdmin
-                          ? "Este cliente no tiene máquinas asignadas en el apartado 'Equipos'. Escribe el nombre o asígnala en Administración."
-                          : "No tienes máquinas registradas aún en el sistema. Escribe el nombre o modelo de tu máquina."}
-                      </p>
+                {isAdmin && !adminClientTarget ? (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Máquina afectada *
+                    </label>
+                    <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 p-3.5 text-center text-xs text-muted-foreground">
+                      👆 Selecciona primero un cliente arriba para ver sus máquinas de Equipos.
                     </div>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                      <span>Máquina afectada *</span>
+                      <span className="text-[11px] text-primary lowercase font-normal">
+                        {assignedMachines.length} {assignedMachines.length === 1 ? "máquina en equipos" : "máquinas en equipos"}
+                      </span>
+                    </label>
+
+                    {assignedMachines.length > 0 ? (
+                      <select
+                        className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary font-medium text-foreground cursor-pointer"
+                        value={selectedMachineName}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setSelectedMachineName(val);
+                          const m = assignedMachines.find((x) => x.displayName === val);
+                          if (m) setSelectedMachineId(m.id);
+                        }}
+                        required
+                      >
+                        <option value="">-- Elige la máquina que tiene la avería --</option>
+                        {assignedMachines.map((m) => (
+                          <option key={m.id} value={m.displayName}>
+                            {m.displayName}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="space-y-2">
+                        <Input
+                          placeholder="Nombre de la máquina (ej. Depuradora mtar-300a)"
+                          value={manualMachineName}
+                          onChange={(e) => setManualMachineName(e.target.value)}
+                          required
+                          className="h-10 text-sm font-medium rounded-xl"
+                        />
+                        <p className="text-[11px] text-muted-foreground">
+                          {isAdmin
+                            ? `"${adminClientTarget}" no tiene máquinas asignadas en Equipos. Escribe el nombre o puedes asignarle una en Administración > Equipos.`
+                            : "No tienes máquinas registradas aún en el sistema. Escribe el nombre o modelo de tu máquina."}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Nivel de urgencia */}
                 <div className="space-y-1.5">
