@@ -284,6 +284,13 @@ const photoSchema = z.object({
   descripcion: z.string().optional().default(""),
 });
 
+const elementoSchema = z.object({
+  id: z.string(),
+  nombre: z.string(),
+  descripcion: z.string(),
+  fotoUrl: z.string().optional().default(""),
+});
+
 /**
  * Registra un aviso de avería de cliente.
  * Se guarda en jobs con supabaseAdmin garantizando inserción sin bloqueos de RLS,
@@ -300,6 +307,7 @@ export const submitAveria = createServerFn({ method: "POST" })
         description: z.string().min(1, "Describe el problema"),
         urgency: z.enum(["normal", "urgente"]).default("normal"),
         photos: z.array(photoSchema).default([]),
+        elementos: z.array(elementoSchema).optional().default([]),
       })
       .parse(d)
   )
@@ -331,13 +339,21 @@ export const submitAveria = createServerFn({ method: "POST" })
     const statusNote =
       data.urgency === "urgente" ? "🚨 AVERÍA URGENTE REPORTADA" : "Aviso de avería recibido";
 
+    let fullDescription = data.description;
+    if (data.elementos && data.elementos.length > 0) {
+      const elementosText = data.elementos
+        .map((el, i) => `• [${el.nombre}]: ${el.descripcion}`)
+        .join("\n");
+      fullDescription += `\n\nELEMENTOS AFECTADOS:\n${elementosText}`;
+    }
+
     // Insertar en tabla jobs con descripción limpia y legible (NUNCA JSON crudo)
     const { data: job, error: jobErr } = await supabaseAdmin
       .from("jobs")
       .insert({
         title: `[AVERÍA] ${data.machineName}: ${data.title}`,
         client: clientName,
-        description: data.description,
+        description: fullDescription,
         status: "pendiente",
         status_note: statusNote,
       })
@@ -349,13 +365,14 @@ export const submitAveria = createServerFn({ method: "POST" })
       throw new Error(`Error en base de datos: ${jobErr.message}`);
     }
 
-    // Persistir metadatos completos (fotos, máquina, cliente) en client_equipment
+    // Persistir metadatos completos (fotos, máquina, cliente, elementos) en client_equipment
     try {
       await supabaseAdmin.from("client_equipment").insert({
         client_name: "AVERIA_METADATA",
         modelo: job.id,
         direccion: JSON.stringify({
           photos: data.photos,
+          elementos: data.elementos || [],
           machineId: data.machineId,
           machineName: data.machineName,
           title: data.title,
@@ -572,6 +589,11 @@ export const getAveriasList = createServerFn({ method: "POST" })
         : Array.isArray(parsed?.photos)
         ? parsed.photos
         : [];
+      const elementos = Array.isArray(meta?.elementos)
+        ? meta.elementos
+        : Array.isArray(parsed?.elementos)
+        ? parsed.elementos
+        : [];
       const urgency = (meta?.urgency ||
         parsed?.urgency ||
         (j.status_note?.includes("URGENTE") ? "urgente" : "normal")) as
@@ -593,6 +615,7 @@ export const getAveriasList = createServerFn({ method: "POST" })
         description,
         urgency,
         photos,
+        elementos,
         status,
         statusNote: j.status_note || "",
         createdAt: j.created_at,

@@ -6,6 +6,13 @@ export interface AveriaPhoto {
   descripcion?: string;
 }
 
+export interface AveriaElement {
+  id: string;
+  nombre: string;
+  descripcion: string;
+  fotoUrl?: string;
+}
+
 export interface Averia {
   id: string;
   clientId: string;
@@ -16,6 +23,7 @@ export interface Averia {
   description: string;
   urgency: "normal" | "urgente";
   photos: AveriaPhoto[];
+  elementos?: AveriaElement[];
   status: "pendiente" | "en_curso" | "solucionado";
   statusNote: string;
   createdAt: string;
@@ -31,6 +39,7 @@ export interface CreateAveriaInput {
   description: string;
   urgency: "normal" | "urgente";
   photos: AveriaPhoto[];
+  elementos?: AveriaElement[];
 }
 
 const PERMISOS_CLIENT_NAME = "__GRUPER_AVERIAS_PERMISOS__";

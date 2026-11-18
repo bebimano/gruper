@@ -149,20 +149,20 @@ function Admin() {
           </div>
         </TabsContent>
         <TabsContent value="averias">
-          <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
-            <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-medium">
-              <AlertTriangle className="h-5 w-5" />
+          <div className="mt-4 rounded-2xl border border-border bg-card p-5 space-y-3 shadow-xs">
+            <div className="flex items-center gap-2 text-primary font-bold">
+              <Wrench className="h-5 w-5" />
               <span>Avisos de Averías y Fallos de Clientes</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              Accede al panel completo de averías para consultar las notificaciones enviadas por los clientes, revisar las fotos adjuntas de los fallos y actualizar el estado de reparación.
+              Accede al panel completo de averías para consultar las notificaciones enviadas por los clientes, revisar las fotos adjuntas de la cámara, los elementos que fallan y actualizar el estado de reparación.
             </p>
             <p className="text-xs text-muted-foreground">
-              Puedes activar o desactivar el acceso a este apartado para cada cliente individual desde la pestaña <strong>Usuarios</strong>.
+              Para definir qué máquinas le aparecen a cada cliente en el selector de averías, utiliza la pestaña <strong>Equipos</strong>.
             </p>
-            <Button asChild className="w-full bg-amber-600 hover:bg-amber-700 text-white">
+            <Button asChild className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl h-10 shadow-xs">
               <Link to="/averias">
-                <AlertTriangle className="h-4 w-4 mr-2" /> Ver y gestionar todas las averías
+                <Wrench className="h-4 w-4 mr-2" /> Ver y gestionar todas las averías
               </Link>
             </Button>
           </div>
