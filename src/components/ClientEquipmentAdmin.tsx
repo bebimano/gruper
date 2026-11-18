@@ -16,6 +16,7 @@ import {
   FolderOpen,
 } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +25,36 @@ import {
   assignEquipmentToClientServer,
   deleteEquipmentServer,
 } from "@/lib/equipment.functions";
+
+export type ClientEquipmentRow = {
+  id: string;
+  client_name: string;
+  direccion: string;
+  poblacion: string;
+  tipo_maquina: string;
+  modelo: string;
+  num_serie: string;
+};
+
+export function useClientEquipment(clientName?: string) {
+  return useQuery({
+    queryKey: ["client-equipment", clientName ?? "__all__"],
+    queryFn: async () => {
+      let q = supabase
+        .from("client_equipment")
+        .select("id, client_name, direccion, poblacion, tipo_maquina, modelo, num_serie")
+        .order("client_name")
+        .order("tipo_maquina");
+      if (clientName) q = (q as any).eq("client_name", clientName);
+      const { data, error } = await q;
+      if (error) throw error;
+      const list = ((data ?? []) as ClientEquipmentRow[]).filter(
+        (r) => !r.client_name.startsWith("__") && !r.client_name.startsWith("AVERIA_")
+      );
+      return list;
+    },
+  });
+}
 
 const TIPOS_PREDEFINIDOS = [
   "Depuradora",
