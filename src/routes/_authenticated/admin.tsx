@@ -2,12 +2,13 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { ArrowLeft, Trash2, KeyRound, FileText, RefreshCw, Shield } from "lucide-react";
+import { ArrowLeft, Trash2, KeyRound, FileText, RefreshCw, Shield, AlertTriangle } from "lucide-react";
 import { checkMachinesStatus } from "@/lib/machines.functions";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { createUserAccount, deleteClientUser, resetClientPassword, setUserRole } from "@/lib/users.functions";
 import { useMe } from "@/lib/useRole";
+import { fetchAveriasAllowedUserIds, toggleClientAveriasPermission } from "@/lib/averias";
 import logo from "@/assets/gruper-logo.png.asset.json";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -97,6 +98,7 @@ function Admin() {
           <TabsTrigger value="messages" className="flex-1">Mensajes</TabsTrigger>
           <TabsTrigger value="reports" className="flex-1">Partes</TabsTrigger>
           <TabsTrigger value="vehicles" className="flex-1">Vehículos</TabsTrigger>
+          <TabsTrigger value="averias" className="flex-1">Averías</TabsTrigger>
           <TabsTrigger value="stock" className="flex-1">Stock</TabsTrigger>
           <TabsTrigger value="notify" className="flex-1">Avisos</TabsTrigger>
         </TabsList>
@@ -126,6 +128,25 @@ function Admin() {
         <TabsContent value="vehicles">
           <div className="mt-4">
             <VehiclesAdmin />
+          </div>
+        </TabsContent>
+        <TabsContent value="averias">
+          <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
+            <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-medium">
+              <AlertTriangle className="h-5 w-5" />
+              <span>Avisos de Averías y Fallos de Clientes</span>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Accede al panel completo de averías para consultar las notificaciones enviadas por los clientes, revisar las fotos adjuntas de los fallos y actualizar el estado de reparación.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Puedes activar o desactivar el acceso a este apartado para cada cliente individual desde la pestaña <strong>Usuarios</strong>.
+            </p>
+            <Button asChild className="w-full bg-amber-600 hover:bg-amber-700 text-white">
+              <Link to="/averias">
+                <AlertTriangle className="h-4 w-4 mr-2" /> Ver y gestionar todas las averías
+              </Link>
+            </Button>
           </div>
         </TabsContent>
         <TabsContent value="stock"><MaterialsAdmin /></TabsContent>
@@ -322,10 +343,11 @@ function ClientsAdmin({ myId }: { myId: string }) {
   const clients = useQuery({
     queryKey: ["admin-clients"],
     queryFn: async () => {
-      const [{ data: profiles }, { data: access }, { data: roles }] = await Promise.all([
+      const [{ data: profiles }, { data: access }, { data: roles }, allowedAverias] = await Promise.all([
         supabase.from("profiles").select("*").order("username"),
         supabase.from("machine_access").select("user_id, machine_id"),
         supabase.from("user_roles").select("user_id, role"),
+        fetchAveriasAllowedUserIds(),
       ]);
       const roleMap = new Map((roles ?? []).map((r) => [r.user_id, r.role]));
       return (profiles ?? []).filter((p) => p.id !== myId).map((p) => {
@@ -333,6 +355,7 @@ function ClientsAdmin({ myId }: { myId: string }) {
         return {
           ...item,
           can_view_all_reports: !!item.can_view_all_reports,
+          can_averias: !!item.can_averias || allowedAverias.has(item.id),
           role: (roleMap.get(item.id) as "admin" | "client") ?? "client",
           isAdmin: roleMap.get(item.id) === "admin",
           machineIds: new Set((access ?? []).filter((a) => a.user_id === item.id).map((a) => a.machine_id)),
@@ -340,6 +363,17 @@ function ClientsAdmin({ myId }: { myId: string }) {
       });
     },
   });
+
+  async function toggleAverias(id: string, on: boolean) {
+    try {
+      await toggleClientAveriasPermission(id, on);
+      toast.success(on ? "Acceso a Averías / Fallos activado" : "Acceso a Averías / Fallos desactivado");
+      qc.invalidateQueries({ queryKey: ["admin-clients"] });
+      qc.invalidateQueries({ queryKey: ["me"] });
+    } catch (e) {
+      err(e);
+    }
+  }
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
@@ -471,6 +505,16 @@ function ClientsAdmin({ myId }: { myId: string }) {
               <label className="flex items-center justify-between rounded-lg bg-muted/60 px-3 py-2 text-sm">
                 <span className="flex items-center gap-2"><FileText className="h-4 w-4 text-primary" /> Partes de trabajo</span>
                 <Switch checked={c.can_work_reports} onCheckedChange={(v) => toggleReports(c.id, v)} />
+              </label>
+              <label className="flex items-center justify-between rounded-lg bg-muted/60 px-3 py-2 text-sm">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  <div>
+                    <span className="font-medium">Averías / Fallos</span>
+                    <span className="block text-xs text-muted-foreground">Permite al cliente dar avisos de avería con fotos y ver el estado</span>
+                  </div>
+                </div>
+                <Switch checked={c.can_averias} onCheckedChange={(v) => toggleAverias(c.id, v)} />
               </label>
               {c.can_work_reports && (
                 <>

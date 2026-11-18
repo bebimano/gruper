@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Monitor, LogOut, Settings, ChevronRight, FileText, Wrench } from "lucide-react";
+import { Monitor, LogOut, Settings, ChevronRight, FileText, Wrench, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useMe } from "@/lib/useRole";
 import { Button } from "@/components/ui/button";
@@ -59,19 +59,45 @@ function Machines() {
         <p className="text-muted-foreground text-sm sm:text-base">Selecciona una máquina o gestiona tus trabajos</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-5">
         {me.data?.canReports && (
-          <Link to="/partes" className="flex items-center gap-3 rounded-xl border border-border bg-background px-4 py-3 hover:bg-muted transition-colors shadow-sm">
-            <FileText className="h-5 w-5 text-primary shrink-0" />
-            <span className="flex-1 font-medium">Partes de trabajo</span>
+          <Link to="/partes" className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 hover:bg-muted/60 transition-colors shadow-xs">
+            <div className="p-2 rounded-lg bg-primary/10 text-primary shrink-0">
+              <FileText className="h-5 w-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="block font-medium text-foreground">Partes de trabajo</span>
+              <span className="block text-xs text-muted-foreground">Consulta y redacta partes</span>
+            </div>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </Link>
         )}
-        <Link to="/trabajos" className="flex items-center gap-3 rounded-xl border border-border bg-background px-4 py-3 hover:bg-muted transition-colors shadow-sm">
-          <Wrench className="h-5 w-5 text-primary shrink-0" />
-          <span className="flex-1 font-medium">Trabajos</span>
+        <Link to="/trabajos" className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 hover:bg-muted/60 transition-colors shadow-xs">
+          <div className="p-2 rounded-lg bg-primary/10 text-primary shrink-0">
+            <Wrench className="h-5 w-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <span className="block font-medium text-foreground">Trabajos</span>
+            <span className="block text-xs text-muted-foreground">Estado y tareas del servicio</span>
+          </div>
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </Link>
+        {(me.data?.isAdmin || me.data?.canAverias) && (
+          <Link to="/averias" className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 hover:bg-amber-500/10 transition-colors shadow-xs group">
+            <div className="p-2 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400 shrink-0">
+              <AlertTriangle className="h-5 w-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="block font-medium text-foreground group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+                Averías / Fallos
+              </span>
+              <span className="block text-xs text-muted-foreground">
+                {me.data?.isAdmin ? "Gestionar avisos de avería" : "Avisar de avería con fotos"}
+              </span>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </Link>
+        )}
       </div>
 
       <div className="mt-8 flex-1">

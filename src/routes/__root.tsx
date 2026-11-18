@@ -15,8 +15,9 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
 import { NewReportNotifier } from "@/components/NewReportNotifier";
-import { PushRegistrar } from "@/components/PushRegistrar";
 import { JobNotifier } from "@/components/JobNotifier";
+import { AveriasNotifier } from "@/components/AveriasNotifier";
+import { PushRegistrar } from "@/components/PushRegistrar";
 import { IosInstallPrompt } from "@/components/IosInstallPrompt";
 
 function NotFoundComponent() {
@@ -144,6 +145,7 @@ function RootComponent() {
       <Toaster position="top-center" />
       <NewReportNotifier />
       <JobNotifier />
+      <AveriasNotifier />
       <PushRegistrar />
       <IosInstallPrompt />
     </QueryClientProvider>
