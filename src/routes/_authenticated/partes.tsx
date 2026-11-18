@@ -476,7 +476,7 @@ function Partes() {
                             {w.items.length} {w.items.length === 1 ? "parte" : "partes"}
                           </span>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
                           {w.items.map((r) => renderReportCard(r, w.workerName))}
                         </div>
                       </div>
@@ -542,7 +542,7 @@ function Partes() {
                             {cg.items.length} {cg.items.length === 1 ? "parte" : "partes"}
                           </span>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
                           {cg.items.map((r) => renderReportCard(r, wg.workerName))}
                         </div>
                       </div>

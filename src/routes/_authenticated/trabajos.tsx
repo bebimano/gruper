@@ -97,9 +97,22 @@ function Trabajos() {
         </form>
       )}
 
-      {jobs.data?.length === 0 && <p className="mt-6 rounded-xl border border-border p-6 text-center text-sm text-muted-foreground">No hay trabajos.</p>}
-      <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-3.5">
-        {jobs.data?.map((j) => <JobCard key={j.id} j={j} admin={isAdmin} who={name(j.assigned_to)} onStatus={setStatus} onDelete={remove} />)}
+      {jobs.data?.length === 0 && (
+        <div className="mt-8 rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground bg-card/50">
+          No hay trabajos creados todavía.
+        </div>
+      )}
+      <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {jobs.data?.map((j) => (
+          <JobCard
+            key={j.id}
+            j={j}
+            admin={isAdmin}
+            who={name(j.assigned_to)}
+            onStatus={setStatus}
+            onDelete={remove}
+          />
+        ))}
       </div>
     </main>
   );
@@ -110,23 +123,72 @@ function JobCard({ j, admin, who, onStatus, onDelete }: { j: Job; admin: boolean
   const [note, setNote] = useState(j.status_note);
   const st = statusInfo(j.status);
   return (
-    <div className="rounded-xl border border-border bg-background p-4 space-y-3">
-      <div className="flex items-start gap-3">
-        <Wrench className="mt-0.5 h-5 w-5 text-primary" />
-        <div className="flex-1 min-w-0">
-          <p className="font-medium">{j.title}</p>
-          <p className="text-xs text-muted-foreground">{[j.client, admin ? who : null, new Date(j.updated_at).toLocaleString("es-ES")].filter(Boolean).join(" · ")}</p>
-          {j.description && <p className="mt-2 text-sm whitespace-pre-wrap">{j.description}</p>}
+    <div className="rounded-2xl border border-border bg-card p-4 sm:p-5 space-y-3.5 shadow-xs transition-all hover:border-primary/40">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3 min-w-0 flex-1">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Wrench className="h-4 w-4" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-bold text-base text-foreground break-words">{j.title}</h3>
+            <p className="text-xs text-muted-foreground mt-0.5 break-words">
+              {[j.client, admin ? who : null, new Date(j.updated_at).toLocaleString("es-ES")].filter(Boolean).join(" · ")}
+            </p>
+            {j.description && (
+              <p className="mt-2.5 text-sm text-foreground/90 whitespace-pre-wrap break-words rounded-lg bg-muted/40 p-2.5 border border-border/60">
+                {j.description}
+              </p>
+            )}
+          </div>
         </div>
-        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${st.cls}`}>{st.label}</span>
-        {admin && <Button variant="ghost" size="icon" onClick={() => onDelete(j.id)} aria-label="Eliminar"><Trash2 /></Button>}
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${st.cls}`}>{st.label}</span>
+          {admin && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onDelete(j.id)}
+              aria-label="Eliminar"
+              className="text-muted-foreground hover:text-destructive h-8 w-8"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {JOB_STATUSES.map((s) => (
-          <Button key={s.value} type="button" size="sm" variant={j.status === s.value ? "default" : "outline"} onClick={() => onStatus(j.id, s.value, note)}>{s.label}</Button>
-        ))}
+
+      {/* Selector de estado responsive que no se solapa nunca */}
+      <div className="pt-1">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Estado:</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {JOB_STATUSES.map((s) => {
+            const isSelected = j.status === s.value;
+            return (
+              <button
+                key={s.value}
+                type="button"
+                onClick={() => onStatus(j.id, s.value, note)}
+                className={`flex items-center justify-center px-2 py-2 rounded-xl text-xs font-semibold border transition-all text-center select-none active:scale-95 ${
+                  isSelected
+                    ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                    : "bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
+                }`}
+              >
+                <span className="truncate">{s.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
-      <Input placeholder="Nota del estado (opcional)" value={note} onChange={(e) => setNote(e.target.value)} onBlur={() => note !== j.status_note && onStatus(j.id, j.status, note)} />
+
+      <Input
+        placeholder="Nota del estado (opcional)"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        onBlur={() => note !== j.status_note && onStatus(j.id, j.status, note)}
+        className="h-10 text-sm bg-background"
+      />
     </div>
   );
 }
