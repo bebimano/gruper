@@ -77,7 +77,6 @@ export async function generatePdfDoc(r: WorkReport, number: string | number, cre
     ["Vehículo", r.vehiculo || "—"],
     ["Modelo / Máq.", r.codigoMaquina || "—"],
     ["Nº serie", r.numSerie || "—"],
-    ["Reparación", r.reparacion || "—"],
   ]);
 
   title("Horas de trabajo");

@@ -515,7 +515,6 @@ function Parte() {
 
             <Field label="Modelo / Código máquina" {...f("codigoMaquina")} />
             <Field label="Nº serie" {...f("numSerie")} />
-            <Field label="Reparación" {...f("reparacion")} />
           </div>
 
           {/* Machine quick-pick: shown when there are registered machines for the selected client */}
