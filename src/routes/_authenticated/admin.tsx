@@ -2,7 +2,27 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { ArrowLeft, Trash2, KeyRound, FileText, RefreshCw, Shield, AlertTriangle, Bell, Wrench } from "lucide-react";
+import {
+  ArrowLeft,
+  Trash2,
+  KeyRound,
+  FileText,
+  RefreshCw,
+  Shield,
+  AlertTriangle,
+  Bell,
+  Wrench,
+  Cpu,
+  Users,
+  CalendarCheck,
+  Boxes,
+  Building2,
+  Truck,
+  Package,
+  ShieldCheck,
+  Mail,
+} from "lucide-react";
+import { GreetingWeatherCard } from "@/components/GreetingWeatherCard";
 import { checkMachinesStatus } from "@/lib/machines.functions";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -88,40 +108,99 @@ export const Route = createFileRoute("/_authenticated/admin")({
 
 const err = (e: unknown) => toast.error(e instanceof Error ? e.message : "Error");
 
+const ADMIN_TABS = [
+  { value: "machines", label: "Máquinas", icon: Cpu },
+  { value: "clients", label: "Usuarios", icon: Users },
+  { value: "daily_jobs", label: "Trabajos al día", icon: CalendarCheck },
+  { value: "equipment", label: "Equipos", icon: Boxes },
+  { value: "client_reports", label: "Partes por cliente", icon: Building2 },
+  { value: "reports", label: "Partes", icon: FileText },
+  { value: "averias", label: "Averías", icon: AlertTriangle },
+  { value: "vehicles", label: "Vehículos", icon: Truck },
+  { value: "stock", label: "Stock", icon: Package },
+  { value: "opens", label: "Accesos", icon: ShieldCheck },
+  { value: "messages", label: "Mensajes", icon: Mail },
+  { value: "notify", label: "Avisos", icon: Bell },
+] as const;
+
 function Admin() {
   const me = useMe();
+  const [activeTab, setActiveTab] = useState<string>("machines");
+
   if (me.isLoading) return null;
   if (!me.data?.isAdmin) return <p className="p-8 text-center text-muted-foreground">No autorizado</p>;
   return (
     <main className="min-h-screen bg-hero px-4 sm:px-6 md:px-8 safe-top safe-bottom max-w-5xl w-full mx-auto pb-12">
-      <header className="py-3">
-        <div className="flex items-center justify-between">
-          <img src={logo.url} alt="Gruper" width={1076} height={343} className="h-8 sm:h-9 w-auto" />
-          <Link
-            to="/maquinas"
-            className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-card px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-foreground/90 shadow-2xs transition-all hover:bg-muted hover:border-primary/50 hover:text-primary active:scale-95"
-          >
+      <header className="flex items-center justify-between py-3">
+        <img src={logo.url} alt="Gruper" width={1076} height={343} className="h-9 sm:h-11 w-auto" />
+        <Button
+          variant="outline"
+          asChild
+          className="rounded-xl border border-border/80 bg-card h-10 sm:h-11 px-3 sm:px-4 text-xs sm:text-sm font-semibold shadow-2xs hover:border-primary/50 hover:bg-muted hover:text-primary active:scale-95 transition-all cursor-pointer gap-2"
+        >
+          <Link to="/maquinas">
             <ArrowLeft className="h-4 w-4 text-primary" />
             <span>Volver a máquinas</span>
           </Link>
-        </div>
-        <h1 className="mt-4 text-2xl sm:text-3xl font-bold">Administración</h1>
+        </Button>
       </header>
-      <Tabs defaultValue="machines" className="mt-2">
-        <TabsList className="w-full h-auto flex-wrap">
-          <TabsTrigger value="machines" className="flex-1">Máquinas</TabsTrigger>
-          <TabsTrigger value="clients" className="flex-1">Usuarios</TabsTrigger>
-          <TabsTrigger value="daily_jobs" className="flex-1">Trabajos realizados al día</TabsTrigger>
-          <TabsTrigger value="equipment" className="flex-1">Equipos</TabsTrigger>
-          <TabsTrigger value="client_reports" className="flex-1">Partes por cliente</TabsTrigger>
-          <TabsTrigger value="opens" className="flex-1">Accesos</TabsTrigger>
-          <TabsTrigger value="messages" className="flex-1">Mensajes</TabsTrigger>
-          <TabsTrigger value="reports" className="flex-1">Partes</TabsTrigger>
-          <TabsTrigger value="vehicles" className="flex-1">Vehículos</TabsTrigger>
-          <TabsTrigger value="averias" className="flex-1">Averías</TabsTrigger>
-          <TabsTrigger value="stock" className="flex-1">Stock</TabsTrigger>
-          <TabsTrigger value="notify" className="flex-1">Avisos</TabsTrigger>
-        </TabsList>
+
+      {/* Saludo dinámico con temperatura, hora y humedad */}
+      <div className="mt-4 sm:mt-5">
+        <GreetingWeatherCard
+          userName={me.data.username}
+          subtitle="Panel de administración y supervisión técnica global de Gruper Remote."
+          badge={
+            <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px] font-bold px-2 py-0.5 rounded-md">
+              <Shield className="h-3 w-3 mr-1 inline" /> Panel Administrador
+            </Badge>
+          }
+        />
+      </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-5 space-y-4">
+        {/* Selector rápido para móviles (< md) */}
+        <div className="md:hidden rounded-2xl border border-border/80 bg-card/90 backdrop-blur p-2.5 shadow-2xs flex items-center gap-2">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-1 shrink-0">
+            Sección:
+          </span>
+          <select
+            value={activeTab}
+            onChange={(e) => setActiveTab(e.target.value)}
+            className="flex-1 bg-muted/60 border border-border/80 rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+          >
+            {ADMIN_TABS.map((tab) => (
+              <option key={tab.value} value={tab.value}>
+                {tab.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Menú de pestañas industrial auto-ajustable con scroll suave y píldoras táctiles */}
+        <div className="w-full overflow-hidden rounded-2xl border border-border/80 bg-card/85 backdrop-blur p-1.5 shadow-2xs">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth py-0.5 px-0.5">
+            {ADMIN_TABS.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.value;
+              return (
+                <button
+                  key={tab.value}
+                  type="button"
+                  onClick={() => setActiveTab(tab.value)}
+                  className={`whitespace-nowrap px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+                    isActive
+                      ? "bg-primary text-primary-foreground border border-primary/40 shadow-[0_2px_8px_rgba(37,159,253,0.35)] font-bold"
+                      : "bg-muted/40 hover:bg-muted text-foreground/80 hover:text-foreground border border-border/40"
+                  }`}
+                >
+                  <Icon className={`h-4 w-4 shrink-0 ${isActive ? "text-primary-foreground" : "text-primary"}`} />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
         <TabsContent value="machines"><MachinesAdmin /></TabsContent>
         <TabsContent value="clients">
           <ClientsAdmin myId={me.data.id} />
