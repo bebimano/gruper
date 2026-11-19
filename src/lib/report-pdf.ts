@@ -16,6 +16,55 @@ async function toDataUrl(url: string): Promise<string | null> {
   }
 }
 
+/** Recorta una imagen al centro para que sea 100% cuadrada sin deformar ni aplastar el contenido */
+async function cropToSquare(url: string): Promise<string> {
+  return new Promise((resolve) => {
+    try {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        try {
+          const w = img.naturalWidth || img.width;
+          const h = img.naturalHeight || img.height;
+          if (!w || !h) {
+            resolve(url);
+            return;
+          }
+          const minDim = Math.min(w, h);
+          // Resolución cuadrada óptima (hasta 1200px para máxima nitidez en PDF sin saturar memoria)
+          const targetSize = Math.min(minDim, 1200);
+
+          const canvas = document.createElement("canvas");
+          canvas.width = targetSize;
+          canvas.height = targetSize;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            resolve(url);
+            return;
+          }
+
+          // Recorte centrado (object-fit: cover en formato cuadrado)
+          const sx = (w - minDim) / 2;
+          const sy = (h - minDim) / 2;
+
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, targetSize, targetSize);
+          ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, targetSize, targetSize);
+
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+          resolve(dataUrl);
+        } catch {
+          resolve(url);
+        }
+      };
+      img.onerror = () => resolve(url);
+      img.src = url;
+    } catch {
+      resolve(url);
+    }
+  });
+}
+
 /** Generates clean, standard filename: e.g. Parte_1_Juan_EmpresaABC.pdf or Parte_Taller_1_... */
 export function getReportFilename(number: string | number, creatorName?: string, cliente?: string, tipo?: "trabajo" | "taller"): string {
   const clean = (s: string) => s.trim().replace(/[/\\?%*:|"<>]/g, "").replace(/\s+/g, "_");
@@ -166,32 +215,55 @@ export async function generatePdfDoc(r: WorkReport, number: string | number, cre
   const validFotos = (r.fotos || []).filter((f) => f.url);
   if (validFotos.length > 0) {
     title("Fotografías del trabajo (Antes / Después)");
-    const gap = 6;
-    const photoW = (W - 2 * M - gap) / 2;
-    const photoH = 50;
-    for (let i = 0; i < validFotos.length; i += 2) {
-      const batch = validFotos.slice(i, i + 2);
-      const maxDescLen = Math.max(...batch.map((f) => (f.descripcion?.trim() ? doc.splitTextToSize(f.descripcion.trim(), photoW).length : 0)));
+    const gap = 10;
+    const photoSize = (W - 2 * M - gap) / 2; // = 86 mm (cuadradas, idénticas de medidas)
+
+    // Pre-procesar todas las imágenes en paralelo recortadas al centro en cuadrado perfecto (1:1)
+    const squaredFotos = await Promise.all(
+      validFotos.map(async (f) => ({
+        ...f,
+        squareUrl: await cropToSquare(f.url),
+      }))
+    );
+
+    for (let i = 0; i < squaredFotos.length; i += 2) {
+      const batch = squaredFotos.slice(i, i + 2);
+      const maxDescLen = Math.max(
+        ...batch.map((f) =>
+          f.descripcion?.trim()
+            ? doc.splitTextToSize(f.descripcion.trim(), photoSize).length
+            : 0
+        )
+      );
       const extraH = maxDescLen > 0 ? maxDescLen * 3.5 + 4 : 0;
 
-      need(photoH + 12 + extraH);
+      need(photoSize + 12 + extraH);
       batch.forEach((f, idx) => {
-        const x = M + idx * (photoW + gap);
+        const x = M + idx * (photoSize + gap);
         doc.setFont("helvetica", "bold").setFontSize(8).setTextColor(50);
-        const label = f.tipo === "antes" ? "ANTES (Avería / Estado inicial)" : f.tipo === "despues" ? "DESPUÉS (Reparación / Estado final)" : (f.titulo || "Foto de trabajo");
+        const label =
+          f.tipo === "antes"
+            ? "ANTES (Avería / Estado inicial)"
+            : f.tipo === "despues"
+            ? "DESPUÉS (Reparación / Estado final)"
+            : f.titulo || "Foto de trabajo";
         doc.text(label, x, y + 3);
         try {
-          doc.addImage(f.url, "JPEG", x, y + 5, photoW, photoH);
+          doc.addImage(f.squareUrl, "JPEG", x, y + 5, photoSize, photoSize);
+          // Marco fino y limpio para delimitar la foto
+          doc.setDrawColor(220, 225, 230);
+          doc.setLineWidth(0.2);
+          doc.rect(x, y + 5, photoSize, photoSize);
         } catch (imgErr) {
           console.error("Error adding photo to PDF", imgErr);
         }
         if (f.descripcion?.trim()) {
           doc.setFont("helvetica", "normal").setFontSize(7.5).setTextColor(60);
-          const descLines = doc.splitTextToSize(f.descripcion.trim(), photoW);
-          doc.text(descLines, x, y + photoH + 9);
+          const descLines = doc.splitTextToSize(f.descripcion.trim(), photoSize);
+          doc.text(descLines, x, y + photoSize + 9);
         }
       });
-      y += photoH + 11 + extraH;
+      y += photoSize + 12 + extraH;
     }
     y += 2;
   }

@@ -251,9 +251,9 @@ export function ReportPhotos({ fotos = [], onChange, disabled = false }: ReportP
                   </div>
                 </div>
 
-                {/* IMAGEN DE LA FOTO */}
+                {/* IMAGEN DE LA FOTO (CUADRADA Y DE MEDIDAS IGUALES) */}
                 <div
-                  className="relative group overflow-hidden rounded-lg border border-border bg-black/5 aspect-[4/3] flex items-center justify-center cursor-pointer"
+                  className="relative group overflow-hidden rounded-lg border border-border bg-black/5 aspect-square flex items-center justify-center cursor-pointer"
                   onClick={() => {
                     setPreviewTitle(
                       isAntes

@@ -5,6 +5,53 @@ import type { Averia } from "./averias";
 // @ts-ignore
 import logo from "@/assets/gruper-logo.png.asset.json";
 
+/** Recorta una imagen al centro para que sea 100% cuadrada sin deformar ni aplastar */
+async function cropToSquare(url: string): Promise<string> {
+  return new Promise((resolve) => {
+    try {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        try {
+          const w = img.naturalWidth || img.width;
+          const h = img.naturalHeight || img.height;
+          if (!w || !h) {
+            resolve(url);
+            return;
+          }
+          const minDim = Math.min(w, h);
+          const targetSize = Math.min(minDim, 1000);
+
+          const canvas = document.createElement("canvas");
+          canvas.width = targetSize;
+          canvas.height = targetSize;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            resolve(url);
+            return;
+          }
+
+          const sx = (w - minDim) / 2;
+          const sy = (h - minDim) / 2;
+
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, targetSize, targetSize);
+          ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, targetSize, targetSize);
+
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+          resolve(dataUrl);
+        } catch {
+          resolve(url);
+        }
+      };
+      img.onerror = () => resolve(url);
+      img.src = url;
+    } catch {
+      resolve(url);
+    }
+  });
+}
+
 /** Genera un PDF del informe de avería resuelta */
 export async function generateAveriaReportPdf(averia: Averia): Promise<jsPDF> {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
@@ -182,14 +229,24 @@ export async function generateAveriaReportPdf(averia: Averia): Promise<jsPDF> {
     const cols = Math.floor(contentW / (photoSize + gap));
     let col = 0;
 
-    for (const photo of averia.photos) {
+    const squaredPhotos = await Promise.all(
+      averia.photos.map(async (p) => ({
+        ...p,
+        squareUrl: await cropToSquare(p.url),
+      }))
+    );
+
+    for (const photo of squaredPhotos) {
       try {
         if (y + photoSize + 10 > pageH - 20) {
           doc.addPage();
           y = 20;
         }
         const xPos = margin + col * (photoSize + gap);
-        doc.addImage(photo.url, "JPEG", xPos, y, photoSize, photoSize);
+        doc.addImage(photo.squareUrl, "JPEG", xPos, y, photoSize, photoSize);
+        doc.setDrawColor(220, 225, 230);
+        doc.setLineWidth(0.2);
+        doc.rect(xPos, y, photoSize, photoSize);
         col++;
         if (col >= cols) {
           col = 0;
