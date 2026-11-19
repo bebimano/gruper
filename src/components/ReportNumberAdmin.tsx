@@ -86,7 +86,7 @@ export function ReportNumberAdmin() {
     try {
       const result = await changeFn({ data: { id: r.id, newNumber: newNum } });
 
-      if ("conflict" in result && result.conflict) {
+      if (result.conflict) {
         toast.error(
           `El número ${result.conflictNum} ya está en uso por el parte de "${result.conflictCliente || "(sin cliente)"}". Elige otro número.`,
           { duration: 6000 }

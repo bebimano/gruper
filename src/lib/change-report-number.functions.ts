@@ -74,7 +74,8 @@ export const changeReportNumberServer = createServerFn({ method: "POST" })
 
     if (conflictByUserNumber) {
       return {
-        conflict: true as const,
+        conflict: true,
+        ok: false,
         conflictNum: data.newNumber,
         conflictCliente: String(
           (conflictByUserNumber.data as { cliente?: string })?.cliente ?? ""
@@ -94,7 +95,8 @@ export const changeReportNumberServer = createServerFn({ method: "POST" })
 
     if (conflictByOriginal) {
       return {
-        conflict: true as const,
+        conflict: true,
+        ok: false,
         conflictNum: data.newNumber,
         conflictCliente: String(
           (conflictByOriginal.data as { cliente?: string })?.cliente ?? ""
@@ -111,5 +113,5 @@ export const changeReportNumberServer = createServerFn({ method: "POST" })
 
     if (error) throw error;
 
-    return { ok: true as const };
+    return { ok: true, conflict: false, conflictNum: 0, conflictCliente: "", conflictId: "" };
   });
