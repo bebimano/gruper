@@ -10,7 +10,6 @@ import {
   getAllReportsForNumberingServer,
   changeReportNumberServer,
 } from "@/lib/reports.functions";
-import { useWorkerInitials, formatReportNumber } from "@/lib/worker-initials";
 
 type Report = {
   id: string;
@@ -29,10 +28,8 @@ export function ReportNumberAdmin() {
   const qc = useQueryClient();
   const getAllFn = useServerFn(getAllReportsForNumberingServer);
   const changeFn = useServerFn(changeReportNumberServer);
-  const { data: initials } = useWorkerInitials();
 
   const [search, setSearch] = useState("");
-  // editingId → the report being edited
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -76,7 +73,6 @@ export function ReportNumberAdmin() {
       return;
     }
 
-    // Confirm dialog
     const confirmed = window.confirm(
       `¿Seguro que quieres cambiar el número del parte de "${r.cliente || "(sin cliente)"}" de ${currentNum} a ${newNum}?`
     );
@@ -152,7 +148,6 @@ export function ReportNumberAdmin() {
             <div className="divide-y divide-border">
               {filtered.map((r) => {
                 const displayNum = r.user_number ?? r.number;
-                const formatted = formatReportNumber(initials, r.created_at, displayNum);
                 const isEditing = editingId === r.id;
 
                 return (
@@ -164,11 +159,11 @@ export function ReportNumberAdmin() {
                     <div className="shrink-0">
                       {r.user_number !== null ? (
                         <Badge className="bg-primary/10 text-primary border-primary/20 font-mono text-xs font-semibold">
-                          {formatted}
+                          Nº {displayNum}
                         </Badge>
                       ) : (
                         <Badge variant="outline" className="font-mono text-xs font-semibold text-muted-foreground">
-                          {formatted}
+                          Nº {displayNum}
                         </Badge>
                       )}
                     </div>
