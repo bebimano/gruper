@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   getAllReportsForNumberingServer,
   changeReportNumberServer,
-} from "@/lib/change-report-number.functions";
+} from "@/lib/reports.functions";
 import { useWorkerInitials, formatReportNumber } from "@/lib/worker-initials";
 
 type Report = {

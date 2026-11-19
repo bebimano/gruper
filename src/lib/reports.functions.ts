@@ -174,3 +174,102 @@ export const setUserReportViewAccess = createServerFn({ method: "POST" })
     if (error) throw error;
     return { ok: true };
   });
+
+/**
+ * Admin: Lista todos los partes para el panel de numeración.
+ */
+export const getAllReportsForNumberingServer = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: adminRole } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", context.userId)
+      .eq("role", "admin")
+      .maybeSingle();
+    if (!adminRole) throw new Error("No autorizado");
+
+    const { data, error } = await supabaseAdmin
+      .from("work_reports")
+      .select("id, number, user_number, created_at, data")
+      .order("number", { ascending: false });
+
+    if (error) throw error;
+
+    return {
+      reports: (data ?? []).map((r) => ({
+        id: r.id as string,
+        number: r.number as number,
+        user_number: r.user_number as number | null,
+        created_at: r.created_at as string,
+        cliente: String((r.data as { cliente?: string })?.cliente ?? ""),
+      })),
+    };
+  });
+
+/**
+ * Admin: Cambia el user_number de un parte con validación de conflicto.
+ */
+export const changeReportNumberServer = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({ id: z.string().uuid(), newNumber: z.number().int().positive() }).parse(d)
+  )
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: adminRole } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", context.userId)
+      .eq("role", "admin")
+      .maybeSingle();
+    if (!adminRole) throw new Error("No autorizado");
+
+    // Conflicto por user_number
+    const { data: c1 } = await supabaseAdmin
+      .from("work_reports")
+      .select("id, data")
+      .eq("user_number", data.newNumber)
+      .neq("id", data.id)
+      .maybeSingle();
+
+    if (c1) {
+      return {
+        conflict: true,
+        ok: false,
+        conflictNum: data.newNumber,
+        conflictCliente: String((c1.data as { cliente?: string })?.cliente ?? ""),
+        conflictId: c1.id as string,
+      };
+    }
+
+    // Conflicto por número original
+    const { data: c2 } = await supabaseAdmin
+      .from("work_reports")
+      .select("id, data")
+      .eq("number", data.newNumber)
+      .is("user_number", null)
+      .neq("id", data.id)
+      .maybeSingle();
+
+    if (c2) {
+      return {
+        conflict: true,
+        ok: false,
+        conflictNum: data.newNumber,
+        conflictCliente: String((c2.data as { cliente?: string })?.cliente ?? ""),
+        conflictId: c2.id as string,
+      };
+    }
+
+    const { error } = await supabaseAdmin
+      .from("work_reports")
+      .update({ user_number: data.newNumber } as any)
+      .eq("id", data.id);
+
+    if (error) throw error;
+    return { ok: true, conflict: false, conflictNum: 0, conflictCliente: "", conflictId: "" };
+  });
