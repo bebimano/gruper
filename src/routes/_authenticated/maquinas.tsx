@@ -21,6 +21,7 @@ import { useMe } from "@/lib/useRole";
 import { Button } from "@/components/ui/button";
 import { AboutLink } from "@/components/AboutLink";
 import { ContactLink } from "@/components/ContactLink";
+import { IndustrialHmiIcon } from "@/components/IndustrialHmiIcon";
 import logo from "@/assets/gruper-logo.png.asset.json";
 
 export const Route = createFileRoute("/_authenticated/maquinas")({
@@ -333,7 +334,7 @@ function Machines() {
         {!machines.isLoading && machinesCount === 0 && (
           <div className="rounded-3xl border border-dashed border-border/90 bg-card/70 backdrop-blur p-7 sm:p-9 text-center shadow-xs">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary mb-3.5">
-              <Monitor className="h-7 w-7" />
+              <IndustrialHmiIcon className="h-8 w-8" />
             </div>
             <h3 className="text-base sm:text-lg font-bold text-foreground">
               Sin máquinas remotas asignadas
@@ -361,26 +362,37 @@ function Machines() {
                 key={m.id}
                 to="/maquina/$id"
                 params={{ id: m.id }}
-                className="group flex items-center gap-4 rounded-2xl border border-border bg-card p-4 sm:p-4.5 shadow-xs active:scale-[0.98] transition hover:border-primary/60 hover:shadow-md cursor-pointer"
+                className="group flex items-center gap-3.5 sm:gap-4 rounded-2xl border border-border bg-card p-4 sm:p-4.5 shadow-xs active:scale-[0.98] transition hover:border-primary/80 hover:shadow-md cursor-pointer"
               >
-                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-primary/15 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                  <Monitor className="h-6 w-6" />
+                {/* Icono HMI Industrial */}
+                <span className="grid h-13 w-13 sm:h-14 sm:w-14 shrink-0 place-items-center rounded-2xl bg-primary/10 border border-primary/20 text-primary group-hover:bg-primary/20 transition-colors shadow-2xs">
+                  <IndustrialHmiIcon className="h-8 w-8 sm:h-9 sm:w-9" />
                 </span>
+
                 <span className="flex-1 min-w-0">
-                  <span className="block font-semibold text-sm sm:text-base truncate text-foreground group-hover:text-primary transition-colors">
+                  <span className="block font-bold text-sm sm:text-base truncate text-foreground group-hover:text-primary transition-colors">
                     {m.name}
                   </span>
-                  {m.description ? (
-                    <span className="block text-xs text-muted-foreground line-clamp-2 mt-0.5">
-                      {m.description}
+
+                  {/* Piloto LED azul del logo y texto de estado conexión activa */}
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="relative flex h-2.5 w-2.5 shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary shadow-[0_0_8px_#259ffd]"></span>
                     </span>
-                  ) : (
-                    <span className="block text-xs text-muted-foreground mt-0.5">
-                      Conexión remota VNC activa
+                    <span className="text-[11px] sm:text-xs font-semibold text-foreground/90">
+                      Estado: <span className="text-primary font-bold">Conexión activa</span>
+                    </span>
+                  </div>
+
+                  {m.description && (
+                    <span className="block text-xs text-muted-foreground line-clamp-1 mt-0.5">
+                      {m.description}
                     </span>
                   )}
                 </span>
-                <span className="flex items-center gap-1 text-xs font-semibold text-primary shrink-0 opacity-70 group-hover:opacity-100 transition-opacity">
+
+                <span className="flex items-center gap-1 text-xs font-semibold text-primary shrink-0 opacity-80 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all">
                   <span className="hidden sm:inline">Abrir</span>
                   <ChevronRight className="h-4 w-4" />
                 </span>
