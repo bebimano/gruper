@@ -273,3 +273,176 @@ export const changeReportNumberServer = createServerFn({ method: "POST" })
     if (error) throw error;
     return { ok: true, conflict: false, conflictNum: 0, conflictCliente: "", conflictId: "" };
   });
+
+export type ClientReportItem = {
+  id: string;
+  number: number;
+  user_number: number | null;
+  displayNumber: number;
+  created_at: string;
+  closed: boolean;
+  tecnico: string;
+};
+
+export type ClientReportsSummary = {
+  clientName: string;
+  isRegisteredUser: boolean;
+  totalPartes: number;
+  lastParteNumber: number | null;
+  lastParteDate: string | null;
+  partes: ClientReportItem[];
+};
+
+/**
+ * Admin: Obtiene el resumen consolidado de partes por cliente.
+ * Para cada cliente devuelve:
+ * - si tiene partes
+ * - cuántos partes tiene hechos
+ * - listado de los números de parte que tiene hechos
+ * - por cuál número va (el último número de parte generado para él)
+ */
+export const getClientReportsSummaryAdminServer = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Verificar que el usuario sea admin
+    const { data: adminRole } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", context.userId)
+      .eq("role", "admin")
+      .maybeSingle();
+    if (!adminRole) throw new Error("No autorizado");
+
+    const [{ data: profiles }, { data: contacts }, { data: equipmentRows }, { data: reports }] =
+      await Promise.all([
+        supabaseAdmin.from("profiles").select("id, username").order("username"),
+        supabaseAdmin.from("report_contacts").select("name").order("name"),
+        supabaseAdmin.from("client_equipment").select("client_name"),
+        supabaseAdmin
+          .from("work_reports")
+          .select("id, number, user_number, created_at, closed, data")
+          .order("created_at", { ascending: false }),
+      ]);
+
+    const registeredUsernames = new Set(
+      (profiles ?? [])
+        .map((p) => (p.username || "").trim().toLowerCase())
+        .filter(Boolean)
+    );
+
+    const clientMap = new Map<
+      string,
+      {
+        displayName: string;
+        isRegisteredUser: boolean;
+        partes: ClientReportItem[];
+      }
+    >();
+
+    // 1. Clientes registrados
+    for (const p of profiles ?? []) {
+      const name = (p.username || "").trim();
+      if (!name) continue;
+      const key = name.toLowerCase();
+      if (!clientMap.has(key)) {
+        clientMap.set(key, {
+          displayName: name,
+          isRegisteredUser: true,
+          partes: [],
+        });
+      }
+    }
+
+    // 2. Contactos de partes
+    for (const c of contacts ?? []) {
+      const name = (c.name || "").trim();
+      if (!name) continue;
+      const key = name.toLowerCase();
+      if (!clientMap.has(key)) {
+        clientMap.set(key, {
+          displayName: name,
+          isRegisteredUser: registeredUsernames.has(key),
+          partes: [],
+        });
+      }
+    }
+
+    // 3. Clientes con equipos
+    for (const eq of equipmentRows ?? []) {
+      const name = (eq.client_name || "").trim();
+      if (!name || name.startsWith("__") || name.startsWith("AVERIA_")) continue;
+      const key = name.toLowerCase();
+      if (!clientMap.has(key)) {
+        clientMap.set(key, {
+          displayName: name,
+          isRegisteredUser: registeredUsernames.has(key),
+          partes: [],
+        });
+      }
+    }
+
+    // 4. Clientes en work_reports
+    for (const r of reports ?? []) {
+      const rawClient = String((r.data as any)?.cliente || "").trim();
+      const clientName = rawClient || "Sin cliente asignado";
+      const key = clientName.toLowerCase();
+
+      if (!clientMap.has(key)) {
+        clientMap.set(key, {
+          displayName: clientName,
+          isRegisteredUser: registeredUsernames.has(key),
+          partes: [],
+        });
+      }
+
+      const item: ClientReportItem = {
+        id: r.id as string,
+        number: r.number as number,
+        user_number: r.user_number as number | null,
+        displayNumber: (r.user_number ?? r.number) as number,
+        created_at: r.created_at as string,
+        closed: !!r.closed,
+        tecnico: String((r.data as any)?.tecnico || "").trim(),
+      };
+
+      clientMap.get(key)!.partes.push(item);
+    }
+
+    // 5. Consolidar lista
+    const clientsList: ClientReportsSummary[] = Array.from(clientMap.values()).map((entry) => {
+      const sortedPartes = [...entry.partes].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+
+      const latestParte = sortedPartes[0] || null;
+
+      return {
+        clientName: entry.displayName,
+        isRegisteredUser: entry.isRegisteredUser,
+        totalPartes: sortedPartes.length,
+        lastParteNumber: latestParte ? latestParte.displayNumber : null,
+        lastParteDate: latestParte ? latestParte.created_at : null,
+        partes: sortedPartes,
+      };
+    });
+
+    clientsList.sort((a, b) => {
+      if (a.totalPartes > 0 && b.totalPartes === 0) return -1;
+      if (a.totalPartes === 0 && b.totalPartes > 0) return 1;
+      if (a.totalPartes > 0 && b.totalPartes > 0) {
+        const timeA = a.lastParteDate ? new Date(a.lastParteDate).getTime() : 0;
+        const timeB = b.lastParteDate ? new Date(b.lastParteDate).getTime() : 0;
+        return timeB - timeA;
+      }
+      return a.clientName.localeCompare(b.clientName, "es-ES");
+    });
+
+    return {
+      clients: clientsList,
+      totalClients: clientsList.length,
+      clientsWithReports: clientsList.filter((c) => c.totalPartes > 0).length,
+      totalReports: (reports ?? []).length,
+    };
+  });

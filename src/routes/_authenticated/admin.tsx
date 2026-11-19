@@ -35,6 +35,7 @@ import { WorkerInitialsAdmin } from "@/components/WorkerInitialsAdmin";
 import { VehiclesAdmin } from "@/components/VehiclesAdmin";
 import { DailyWorkSummaryAdmin } from "@/components/DailyWorkSummaryAdmin";
 import { ReportNumberAdmin } from "@/components/ReportNumberAdmin";
+import { ClientReportsSummaryAdmin } from "@/components/ClientReportsSummaryAdmin";
 
 function EditRequests() {
   const qc = useQueryClient();
@@ -112,6 +113,7 @@ function Admin() {
           <TabsTrigger value="clients" className="flex-1">Usuarios</TabsTrigger>
           <TabsTrigger value="daily_jobs" className="flex-1">Trabajos realizados al día</TabsTrigger>
           <TabsTrigger value="equipment" className="flex-1">Equipos</TabsTrigger>
+          <TabsTrigger value="client_reports" className="flex-1">Partes por cliente</TabsTrigger>
           <TabsTrigger value="opens" className="flex-1">Accesos</TabsTrigger>
           <TabsTrigger value="messages" className="flex-1">Mensajes</TabsTrigger>
           <TabsTrigger value="reports" className="flex-1">Partes</TabsTrigger>
@@ -129,6 +131,7 @@ function Admin() {
         </TabsContent>
         <TabsContent value="daily_jobs"><DailyWorkSummaryAdmin /></TabsContent>
         <TabsContent value="equipment"><div className="mt-4"><ClientEquipmentAdmin /></div></TabsContent>
+        <TabsContent value="client_reports"><div className="mt-4"><ClientReportsSummaryAdmin /></div></TabsContent>
         <TabsContent value="opens"><OpensLog /></TabsContent>
         <TabsContent value="messages"><ContactMessages /></TabsContent>
         <TabsContent value="reports">
