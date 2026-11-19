@@ -34,6 +34,7 @@ import { ClientEquipmentAdmin } from "@/components/ClientEquipmentAdmin";
 import { WorkerInitialsAdmin } from "@/components/WorkerInitialsAdmin";
 import { VehiclesAdmin } from "@/components/VehiclesAdmin";
 import { DailyWorkSummaryAdmin } from "@/components/DailyWorkSummaryAdmin";
+import { ReportNumberAdmin } from "@/components/ReportNumberAdmin";
 
 function EditRequests() {
   const qc = useQueryClient();
@@ -141,6 +142,7 @@ function Admin() {
             <EditRequests />
             <FixedEmailsAdmin />
             <ReportContactsAdmin />
+            <ReportNumberAdmin />
           </div>
         </TabsContent>
         <TabsContent value="vehicles">
