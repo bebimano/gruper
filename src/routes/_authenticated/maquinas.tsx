@@ -43,7 +43,7 @@ function getGreetingData(): { greeting: string; period: "dia" | "tarde" | "noche
   if (hour >= 6 && hour < 14) {
     return { greeting: "Buenos días", period: "dia" };
   }
-  if (hour >= 14 && hour < 21) {
+  if (hour >= 14 && hour < 20) {
     return { greeting: "Buenas tardes", period: "tarde" };
   }
   return { greeting: "Buenas noches", period: "noche" };
