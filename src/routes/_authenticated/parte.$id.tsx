@@ -21,7 +21,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { buildReportPdf, downloadReportPdf, getReportFilename } from "@/lib/report-pdf";
 import { sendReportEmail } from "@/lib/report-email.functions";
 import { notifyEvent } from "@/lib/notify.functions";
-import { logReportOpen } from "@/lib/reports.functions";
+import { logReportOpen, getNextReportNumberServer } from "@/lib/reports.functions";
 import { useWorkerInitials, formatReportNumber } from "@/lib/worker-initials";
 import { ReportPhotos } from "@/components/ReportPhotos";
 import { WorkTimeTracker } from "@/components/WorkTimeTracker";
@@ -87,6 +87,7 @@ function Parte() {
   const sendFn = useServerFn(sendReportEmail);
   const notifyFn = useServerFn(notifyEvent);
   const logOpenFn = useServerFn(logReportOpen);
+  const getNextNumFn = useServerFn(getNextReportNumberServer);
 
   useEffect(() => {
     if (!isNew && id && id !== "nuevo") {
@@ -203,9 +204,33 @@ function Parte() {
     setSaving(true);
     try {
       const payload = r as unknown as Json;
-      const res = isNew
-        ? await supabase.from("work_reports").insert({ data: payload, closed: false }).select("id, number, user_number").single()
-        : await supabase.from("work_reports").update({ data: payload, closed: false, updated_at: new Date().toISOString() }).eq("id", id).select("id, number, user_number").single();
+      let res;
+      if (isNew) {
+        // Get the next configured report number for this worker
+        let userNumber: number | undefined;
+        try {
+          const numResult = await getNextNumFn();
+          userNumber = numResult.nextNumber;
+        } catch (e) {
+          console.warn("Could not get next report number, using default:", e);
+        }
+        res = await supabase
+          .from("work_reports")
+          .insert({
+            data: payload,
+            closed: false,
+            ...(userNumber !== undefined ? { user_number: userNumber } : {}),
+          })
+          .select("id, number, user_number")
+          .single();
+      } else {
+        res = await supabase
+          .from("work_reports")
+          .update({ data: payload, closed: false, updated_at: new Date().toISOString() })
+          .eq("id", id)
+          .select("id, number, user_number")
+          .single();
+      }
       if (res.error) throw res.error;
       toast.success("Borrador guardado");
       qc.invalidateQueries({ queryKey: ["work-reports"] });
@@ -250,9 +275,33 @@ function Parte() {
       setR(updatedReport);
 
       const payload = updatedReport as unknown as Json;
-      const res = isNew
-        ? await supabase.from("work_reports").insert({ data: payload, closed: true }).select("id, number, user_number").single()
-        : await supabase.from("work_reports").update({ data: payload, closed: true, updated_at: new Date().toISOString() }).eq("id", id).select("id, number, user_number").single();
+      let res;
+      if (isNew) {
+        // Get the next configured report number for this worker
+        let userNumber: number | undefined;
+        try {
+          const numResult = await getNextNumFn();
+          userNumber = numResult.nextNumber;
+        } catch (e) {
+          console.warn("Could not get next report number, using default:", e);
+        }
+        res = await supabase
+          .from("work_reports")
+          .insert({
+            data: payload,
+            closed: true,
+            ...(userNumber !== undefined ? { user_number: userNumber } : {}),
+          })
+          .select("id, number, user_number")
+          .single();
+      } else {
+        res = await supabase
+          .from("work_reports")
+          .update({ data: payload, closed: true, updated_at: new Date().toISOString() })
+          .eq("id", id)
+          .select("id, number, user_number")
+          .single();
+      }
 
       if (res.error) throw res.error;
       const savedId = res.data.id;

@@ -56,6 +56,7 @@ import { VehiclesAdmin } from "@/components/VehiclesAdmin";
 import { DailyWorkSummaryAdmin } from "@/components/DailyWorkSummaryAdmin";
 import { ReportNumberAdmin } from "@/components/ReportNumberAdmin";
 import { ClientReportsSummaryAdmin } from "@/components/ClientReportsSummaryAdmin";
+import { WorkerReportConfigAdmin } from "@/components/WorkerReportConfigAdmin";
 
 function EditRequests() {
   const qc = useQueryClient();
@@ -221,6 +222,7 @@ function Admin() {
             </div>
             <VehiclesAdmin />
             <WorkerInitialsAdmin />
+            <WorkerReportConfigAdmin />
             <EditRequests />
             <FixedEmailsAdmin />
             <ReportContactsAdmin />

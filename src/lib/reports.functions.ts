@@ -447,6 +447,156 @@ export const getClientReportsSummaryAdminServer = createServerFn({ method: "POST
     };
   });
 
+/**
+ * Admin: Obtiene la configuración de numeración de partes por trabajador.
+ * Se almacena en client_equipment con un prefijo especial __REPORT_CONFIG__.
+ */
+export const getWorkerReportConfigServer = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: adminRole } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", context.userId)
+      .eq("role", "admin")
+      .maybeSingle();
+    if (!adminRole) throw new Error("No autorizado");
+
+    const { data: rows } = await supabaseAdmin
+      .from("client_equipment")
+      .select("*")
+      .like("client_name", "__REPORT_CONFIG__%");
+
+    const configs = (rows ?? []).map((r) => {
+      const userId = (r.client_name as string).replace("__REPORT_CONFIG__", "");
+      const meta = r as any;
+      return {
+        userId,
+        nextNumber: parseInt(String(meta.num_serie || "1"), 10) || 1,
+        yearPrefix: parseInt(String(meta.modelo || String(new Date().getFullYear())), 10) || new Date().getFullYear(),
+      };
+    });
+
+    return { configs };
+  });
+
+/**
+ * Admin: Configura la numeración de partes para un trabajador.
+ */
+export const setWorkerReportConfigServer = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      userId: z.string().uuid(),
+      nextNumber: z.number().int().min(0),
+      yearPrefix: z.number().int().min(2000).max(2099),
+    }).parse(d)
+  )
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: adminRole } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", context.userId)
+      .eq("role", "admin")
+      .maybeSingle();
+    if (!adminRole) throw new Error("No autorizado");
+
+    const configName = `__REPORT_CONFIG__${data.userId}`;
+
+    // Check if config row exists
+    const { data: existing } = await supabaseAdmin
+      .from("client_equipment")
+      .select("id")
+      .eq("client_name", configName)
+      .maybeSingle();
+
+    if (existing) {
+      // Update
+      const { error } = await supabaseAdmin
+        .from("client_equipment")
+        .update({
+          num_serie: String(data.nextNumber),
+          modelo: String(data.yearPrefix),
+        } as any)
+        .eq("id", existing.id);
+      if (error) throw error;
+    } else {
+      // Insert
+      const { error } = await supabaseAdmin
+        .from("client_equipment")
+        .insert({
+          client_name: configName,
+          tipo_maquina: "report_config",
+          num_serie: String(data.nextNumber),
+          modelo: String(data.yearPrefix),
+        } as any);
+      if (error) throw error;
+    }
+
+    return { ok: true };
+  });
+
+/**
+ * Server function: Get the next report number for a worker and increment the counter.
+ * Called when creating a new report.
+ */
+export const getNextReportNumberServer = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const userId = context.userId;
+    const configName = `__REPORT_CONFIG__${userId}`;
+
+    // Get current config
+    const { data: existing } = await supabaseAdmin
+      .from("client_equipment")
+      .select("id, num_serie, modelo")
+      .eq("client_name", configName)
+      .maybeSingle();
+
+    const currentYear = new Date().getFullYear();
+    let nextNumber: number;
+    let yearPrefix: number;
+
+    if (existing) {
+      nextNumber = parseInt(String((existing as any).num_serie || "1"), 10) || 1;
+      yearPrefix = parseInt(String((existing as any).modelo || String(currentYear)), 10) || currentYear;
+
+      // Increment counter
+      const { error } = await supabaseAdmin
+        .from("client_equipment")
+        .update({
+          num_serie: String(nextNumber + 1),
+        } as any)
+        .eq("id", existing.id);
+      if (error) {
+        console.error("Error incrementing report counter:", error);
+      }
+    } else {
+      // No config exists, create one starting at 1
+      nextNumber = 1;
+      yearPrefix = currentYear;
+
+      const { error } = await supabaseAdmin
+        .from("client_equipment")
+        .insert({
+          client_name: configName,
+          tipo_maquina: "report_config",
+          num_serie: "2", // Next will be 2
+          modelo: String(currentYear),
+        } as any);
+      if (error) {
+        console.error("Error creating report config:", error);
+      }
+    }
+
+    return { nextNumber, yearPrefix };
+  });
+
 function parseTimeToMinutes(t?: string): number | null {
   if (!t) return null;
   const parts = t.trim().split(":");
