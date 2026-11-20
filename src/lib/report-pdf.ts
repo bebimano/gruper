@@ -65,11 +65,24 @@ async function cropToSquare(url: string): Promise<string> {
   });
 }
 
-/** Generates clean, standard filename: e.g. Parte_1_Juan_EmpresaABC.pdf or Parte_Taller_1_... */
+/**
+ * Genera el nombre de archivo del PDF del parte.
+ * Formato: [NUMERO_PARTE].pdf  → ej: BM260001.pdf
+ * Si el número ya está formateado (ej: BM260001) se usa tal cual.
+ * Si no hay número formateado, se usa Parte_[numero]_[cliente].pdf como fallback.
+ */
 export function getReportFilename(number: string | number, creatorName?: string, cliente?: string, tipo?: "trabajo" | "taller"): string {
   const clean = (s: string) => s.trim().replace(/[/\\?%*:|"<>]/g, "").replace(/\s+/g, "_");
+  const numStr = String(number || "nuevo");
+
+  // Si el número tiene letras (ej: BM260001) → usarlo directamente como nombre
+  if (/[a-zA-Z]/.test(numStr) && numStr !== "nuevo") {
+    return `${numStr}.pdf`;
+  }
+
+  // Fallback: Parte_[numero]_[creator]_[cliente].pdf
   const prefix = tipo === "taller" ? "Parte_Taller" : "Parte";
-  const parts = [`${prefix}_${number || "nuevo"}`];
+  const parts = [`${prefix}_${numStr}`];
   if (creatorName?.trim()) parts.push(clean(creatorName));
   if (cliente?.trim()) parts.push(clean(cliente));
   return `${parts.join("_")}.pdf`;

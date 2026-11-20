@@ -29,6 +29,7 @@ import {
   type ClientViewWorkReport,
 } from "@/lib/reports.functions";
 import { downloadReportPdf } from "@/lib/report-pdf";
+import { formatReportNumber, useWorkerInitials } from "@/lib/worker-initials";
 
 export const Route = createFileRoute("/_authenticated/mis-partes")({
   head: () => ({
@@ -59,6 +60,7 @@ function MisPartesView() {
   const qc = useQueryClient();
   const me = useMe();
   const getReportsFn = useServerFn(getMyClientReportsServer);
+  const { getInitials } = useWorkerInitials();
 
   const [search, setSearch] = useState("");
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -99,13 +101,17 @@ function MisPartesView() {
   const handleDownloadPdf = async (report: ClientViewWorkReport) => {
     setDownloadingId(report.id);
     try {
-      toast.info(`Generando PDF oficial del Parte Nº ${report.displayNumber}…`);
+      // Generar número formateado con iniciales del técnico
+      const initials = getInitials(undefined, report.tecnico);
+      const formattedNum = formatReportNumber(initials, report.created_at, report.displayNumber);
+      const displayLabel = formattedNum || String(report.displayNumber);
+      toast.info(`Generando PDF oficial del Parte Nº ${displayLabel}…`);
       await downloadReportPdf(
         report.data,
-        report.displayNumber,
+        formattedNum || report.displayNumber,
         report.tecnico
       );
-      toast.success(`PDF del Parte Nº ${report.displayNumber} descargado con éxito`);
+      toast.success(`PDF del Parte Nº ${displayLabel} descargado con éxito`);
     } catch (err: any) {
       console.error("Error al descargar PDF:", err);
       toast.error(err?.message || "No se pudo generar el documento PDF");
