@@ -17,6 +17,7 @@ import { Route as SobreNosotrosRouteImport } from './routes/sobre-nosotros'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedAveriasRouteImport } from './routes/_authenticated/averias'
 import { Route as AuthenticatedMaquinasRouteImport } from './routes/_authenticated/maquinas'
+import { Route as AuthenticatedMisPartesRouteImport } from './routes/_authenticated/mis-partes'
 import { Route as AuthenticatedPartesRouteImport } from './routes/_authenticated/partes'
 import { Route as AuthenticatedTrabajosRouteImport } from './routes/_authenticated/trabajos'
 import { Route as AuthenticatedMaquinaIdRouteImport } from './routes/_authenticated/maquina.$id'
@@ -61,6 +62,11 @@ const AuthenticatedMaquinasRoute = AuthenticatedMaquinasRouteImport.update({
   path: '/maquinas',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedMisPartesRoute = AuthenticatedMisPartesRouteImport.update({
+  id: '/mis-partes',
+  path: '/mis-partes',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedPartesRoute = AuthenticatedPartesRouteImport.update({
   id: '/partes',
   path: '/partes',
@@ -90,6 +96,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AuthenticatedAdminRoute
   '/averias': typeof AuthenticatedAveriasRoute
   '/maquinas': typeof AuthenticatedMaquinasRoute
+  '/mis-partes': typeof AuthenticatedMisPartesRoute
   '/partes': typeof AuthenticatedPartesRoute
   '/trabajos': typeof AuthenticatedTrabajosRoute
   '/maquina/$id': typeof AuthenticatedMaquinaIdRoute
@@ -103,6 +110,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AuthenticatedAdminRoute
   '/averias': typeof AuthenticatedAveriasRoute
   '/maquinas': typeof AuthenticatedMaquinasRoute
+  '/mis-partes': typeof AuthenticatedMisPartesRoute
   '/partes': typeof AuthenticatedPartesRoute
   '/trabajos': typeof AuthenticatedTrabajosRoute
   '/maquina/$id': typeof AuthenticatedMaquinaIdRoute
@@ -118,6 +126,7 @@ export interface FileRoutesById {
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/averias': typeof AuthenticatedAveriasRoute
   '/_authenticated/maquinas': typeof AuthenticatedMaquinasRoute
+  '/_authenticated/mis-partes': typeof AuthenticatedMisPartesRoute
   '/_authenticated/partes': typeof AuthenticatedPartesRoute
   '/_authenticated/trabajos': typeof AuthenticatedTrabajosRoute
   '/_authenticated/maquina/$id': typeof AuthenticatedMaquinaIdRoute
@@ -133,6 +142,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/averias'
     | '/maquinas'
+    | '/mis-partes'
     | '/partes'
     | '/trabajos'
     | '/maquina/$id'
@@ -146,6 +156,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/averias'
     | '/maquinas'
+    | '/mis-partes'
     | '/partes'
     | '/trabajos'
     | '/maquina/$id'
@@ -160,6 +171,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin'
     | '/_authenticated/averias'
     | '/_authenticated/maquinas'
+    | '/_authenticated/mis-partes'
     | '/_authenticated/partes'
     | '/_authenticated/trabajos'
     | '/_authenticated/maquina/$id'
@@ -232,6 +244,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMaquinasRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/mis-partes': {
+      id: '/_authenticated/mis-partes'
+      path: '/mis-partes'
+      fullPath: '/mis-partes'
+      preLoaderRoute: typeof AuthenticatedMisPartesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/partes': {
       id: '/_authenticated/partes'
       path: '/partes'
@@ -267,6 +286,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedAveriasRoute: typeof AuthenticatedAveriasRoute
   AuthenticatedMaquinasRoute: typeof AuthenticatedMaquinasRoute
+  AuthenticatedMisPartesRoute: typeof AuthenticatedMisPartesRoute
   AuthenticatedPartesRoute: typeof AuthenticatedPartesRoute
   AuthenticatedTrabajosRoute: typeof AuthenticatedTrabajosRoute
   AuthenticatedMaquinaIdRoute: typeof AuthenticatedMaquinaIdRoute
@@ -277,6 +297,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedAveriasRoute: AuthenticatedAveriasRoute,
   AuthenticatedMaquinasRoute: AuthenticatedMaquinasRoute,
+  AuthenticatedMisPartesRoute: AuthenticatedMisPartesRoute,
   AuthenticatedPartesRoute: AuthenticatedPartesRoute,
   AuthenticatedTrabajosRoute: AuthenticatedTrabajosRoute,
   AuthenticatedMaquinaIdRoute: AuthenticatedMaquinaIdRoute,

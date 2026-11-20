@@ -446,3 +446,181 @@ export const getClientReportsSummaryAdminServer = createServerFn({ method: "POST
       totalReports: (reports ?? []).length,
     };
   });
+
+function parseTimeToMinutes(t?: string): number | null {
+  if (!t) return null;
+  const parts = t.trim().split(":");
+  if (parts.length < 2) return null;
+  const h = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  if (isNaN(h) || isNaN(m)) return null;
+  return h * 60 + m;
+}
+
+export type ClientViewWorkReport = {
+  id: string;
+  number: number;
+  user_number: number | null;
+  displayNumber: number;
+  created_at: string;
+  cliente: string;
+  tecnico: string;
+  direccion: string;
+  data: any;
+  totalHoursFormatted: string;
+  totalHours: number;
+  hasSignature: boolean;
+  signerName: string;
+  signatureImage: string | null;
+  trabajosList: Array<{ descripcion: string; cantidad: string; codigo?: string }>;
+  fotosCount: number;
+  closed: boolean;
+};
+
+/**
+ * Consulta los partes de trabajo correspondientes a la empresa del cliente autenticado.
+ * - Solo devuelve los partes que correspondan a su empresa.
+ * - Incluye fecha, horas, trabajos realizados, firma y metadatos para descargar el PDF oficial en cualquier momento.
+ */
+export const getMyClientReportsServer = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({ clientFilter: z.string().optional() }).optional().parse(d)
+  )
+  .handler(async ({ data: input, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const userId = context.userId;
+
+    const [{ data: roleData }, { data: profile }] = await Promise.all([
+      supabaseAdmin
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId)
+        .eq("role", "admin")
+        .maybeSingle(),
+      supabaseAdmin
+        .from("profiles")
+        .select("id, username")
+        .eq("id", userId)
+        .maybeSingle(),
+    ]);
+
+    const isAdmin = !!roleData;
+    const clientUsername = (profile?.username || "").trim();
+
+    let targetClientNames: string[] = [];
+
+    if (isAdmin && input?.clientFilter) {
+      targetClientNames = [input.clientFilter.trim().toLowerCase()];
+    } else if (!isAdmin) {
+      if (!clientUsername) {
+        return {
+          companyName: "Sin empresa asignada",
+          reports: [] as ClientViewWorkReport[],
+          totalReports: 0,
+          totalHoursFormatted: "0 h",
+        };
+      }
+      targetClientNames = [clientUsername.toLowerCase()];
+
+      // Buscar si tiene máquinas asociadas en client_equipment
+      const { data: eq } = await supabaseAdmin
+        .from("client_equipment")
+        .select("client_name");
+      for (const item of eq ?? []) {
+        const cn = (item.client_name || "").trim().toLowerCase();
+        if (
+          cn &&
+          (cn.includes(clientUsername.toLowerCase()) || clientUsername.toLowerCase().includes(cn))
+        ) {
+          if (!targetClientNames.includes(cn)) {
+            targetClientNames.push(cn);
+          }
+        }
+      }
+    }
+
+    // Consultar todos los partes
+    const { data: allReports, error } = await supabaseAdmin
+      .from("work_reports")
+      .select("id, number, user_number, created_at, closed, data")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    // Filtrar los partes que pertenecen a la empresa del cliente
+    const matched = (allReports ?? []).filter((r) => {
+      if (isAdmin && !input?.clientFilter) return true;
+      const repClient = String((r.data as any)?.cliente || "").trim().toLowerCase();
+      if (!repClient) return false;
+      return targetClientNames.some(
+        (target) => repClient === target || repClient.includes(target) || target.includes(repClient)
+      );
+    });
+
+    let cumulativeMinutes = 0;
+
+    const reports: ClientViewWorkReport[] = matched.map((r) => {
+      const d = r.data as any;
+      const displayNumber = (r.user_number ?? r.number) as number;
+
+      let totalMin = 0;
+      if (Array.isArray(d?.dias)) {
+        for (const dia of d.dias) {
+          const mDe = parseTimeToMinutes(dia.mananaDe);
+          const mA = parseTimeToMinutes(dia.mananaA);
+          if (mDe !== null && mA !== null && mA > mDe) totalMin += mA - mDe;
+
+          const tDe = parseTimeToMinutes(dia.tardeDe);
+          const tA = parseTimeToMinutes(dia.tardeA);
+          if (tDe !== null && tA !== null && tA > tDe) totalMin += tA - tDe;
+        }
+      }
+      cumulativeMinutes += totalMin;
+
+      const h = Math.floor(totalMin / 60);
+      const m = totalMin % 60;
+      const totalHoursFormatted = m > 0 ? `${h}h ${m}m` : `${h} h`;
+
+      const trabajosList = Array.isArray(d?.trabajos)
+        ? d.trabajos
+            .filter((t: any) => t?.descripcion?.trim())
+            .map((t: any) => ({
+              descripcion: String(t.descripcion || "").trim(),
+              cantidad: String(t.cantidad || "1").trim(),
+              codigo: String(t.codigo || "").trim(),
+            }))
+        : [];
+
+      return {
+        id: r.id as string,
+        number: r.number as number,
+        user_number: r.user_number as number | null,
+        displayNumber,
+        created_at: r.created_at as string,
+        cliente: String(d?.cliente || clientUsername || "Cliente"),
+        tecnico: String(d?.tecnico || "").trim() || "Técnico Gruper",
+        direccion: String(d?.direccion || "").trim(),
+        data: d,
+        totalHours: totalMin / 60,
+        totalHoursFormatted,
+        hasSignature: !!d?.firma,
+        signerName: String(d?.firmaNombre || "").trim(),
+        signatureImage: d?.firma || null,
+        trabajosList,
+        fotosCount: Array.isArray(d?.fotos) ? d.fotos.length : 0,
+        closed: !!r.closed,
+      };
+    });
+
+    const cumH = Math.floor(cumulativeMinutes / 60);
+    const cumM = cumulativeMinutes % 60;
+    const totalHoursFormatted = cumM > 0 ? `${cumH}h ${cumM}m` : `${cumH} h`;
+
+    return {
+      companyName: clientUsername || "Tu Empresa",
+      reports,
+      totalReports: reports.length,
+      totalHoursFormatted,
+    };
+  });

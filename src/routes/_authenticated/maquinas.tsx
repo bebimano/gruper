@@ -106,6 +106,27 @@ function Machines() {
 
       {/* Accesos directos limpios y en azul uniforme */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-4 sm:mt-5">
+        {/* Acceso para el cliente: Mis Partes de Trabajo */}
+        <Link
+          to="/mis-partes"
+          className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 hover:border-primary/50 hover:bg-muted/60 transition-all shadow-xs active:scale-[0.99] cursor-pointer group"
+        >
+          <div className="p-2.5 rounded-xl bg-primary/10 text-primary shrink-0 group-hover:bg-primary group-hover:text-primary-foreground transition-colors shadow-2xs">
+            <FileText className="h-5 w-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <span className="block font-bold text-sm text-foreground group-hover:text-primary transition-colors">
+              Mis Partes de Trabajo
+            </span>
+            <span className="block text-xs text-muted-foreground truncate">
+              {me.data?.isAdmin
+                ? "Vista de cliente: horas, firmas y PDFs"
+                : "Partes de tu empresa, firmas y PDFs"}
+            </span>
+          </div>
+          <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
+        </Link>
+
         {me.data?.canReports && (
           <Link
             to="/partes"
@@ -115,8 +136,8 @@ function Machines() {
               <FileText className="h-5 w-5" />
             </div>
             <div className="flex-1 min-w-0">
-              <span className="block font-semibold text-sm text-foreground">Partes de trabajo</span>
-              <span className="block text-xs text-muted-foreground">Consulta y redacta partes</span>
+              <span className="block font-semibold text-sm text-foreground">Gestión de partes</span>
+              <span className="block text-xs text-muted-foreground">Redactar y gestionar partes</span>
             </div>
             <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
           </Link>
