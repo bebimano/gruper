@@ -224,7 +224,7 @@ export const getAllReportsForNumberingServer = createServerFn({ method: "POST" }
   });
 
 /**
- * Admin: Cambia el user_number de un parte con validación de conflicto.
+ * Admin: Cambia el user_number de un parte — sin validación de duplicados.
  */
 export const changeReportNumberServer = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -241,43 +241,6 @@ export const changeReportNumberServer = createServerFn({ method: "POST" })
       .eq("role", "admin")
       .maybeSingle();
     if (!adminRole) throw new Error("No autorizado");
-
-    // Conflicto por user_number
-    const { data: c1 } = await supabaseAdmin
-      .from("work_reports")
-      .select("id, data")
-      .eq("user_number", data.newNumber)
-      .neq("id", data.id)
-      .maybeSingle();
-
-    if (c1) {
-      return {
-        conflict: true,
-        ok: false,
-        conflictNum: data.newNumber,
-        conflictCliente: String((c1.data as { cliente?: string })?.cliente ?? ""),
-        conflictId: c1.id as string,
-      };
-    }
-
-    // Conflicto por número original
-    const { data: c2 } = await supabaseAdmin
-      .from("work_reports")
-      .select("id, data")
-      .eq("number", data.newNumber)
-      .is("user_number", null)
-      .neq("id", data.id)
-      .maybeSingle();
-
-    if (c2) {
-      return {
-        conflict: true,
-        ok: false,
-        conflictNum: data.newNumber,
-        conflictCliente: String((c2.data as { cliente?: string })?.cliente ?? ""),
-        conflictId: c2.id as string,
-      };
-    }
 
     const { error } = await supabaseAdmin
       .from("work_reports")

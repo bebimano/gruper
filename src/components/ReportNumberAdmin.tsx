@@ -82,23 +82,9 @@ export function ReportNumberAdmin() {
       return;
     }
 
-    const confirmed = window.confirm(
-      `¿Seguro que quieres cambiar el número del parte de "${r.cliente || "(sin cliente)"}" de ${currentNum} a ${newNum}?`
-    );
-    if (!confirmed) return;
-
     setIsSaving(true);
     try {
-      const result = await changeFn({ data: { id: r.id, newNumber: newNum } });
-
-      if (result.conflict) {
-        toast.error(
-          `El número ${result.conflictNum} ya está en uso por el parte de "${result.conflictCliente || "(sin cliente)"}". Elige otro número.`,
-          { duration: 6000 }
-        );
-        return;
-      }
-
+      await changeFn({ data: { id: r.id, newNumber: newNum } });
       toast.success(`Número del parte actualizado a ${newNum}`);
       cancelEdit();
       qc.invalidateQueries({ queryKey: ["admin-report-numbering"] });
@@ -261,7 +247,7 @@ export function ReportNumberAdmin() {
         <p className="text-xs text-muted-foreground">
           Los partes con número en <span className="font-semibold text-primary">azul</span> tienen un número personalizado.
           Los que aparecen en gris usan el número automático del sistema.
-          Al cambiar un número, si ya está ocupado por otro parte se te avisará antes de aplicar ningún cambio.
+          Puedes asignar cualquier número libremente, incluso si ya lo usa otro parte.
         </p>
       </div>
     </div>
