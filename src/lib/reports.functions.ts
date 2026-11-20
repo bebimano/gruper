@@ -191,21 +191,35 @@ export const getAllReportsForNumberingServer = createServerFn({ method: "POST" }
       .maybeSingle();
     if (!adminRole) throw new Error("No autorizado");
 
-    const { data, error } = await supabaseAdmin
-      .from("work_reports")
-      .select("id, number, user_number, created_at, data")
-      .order("number", { ascending: false });
+    const [{ data, error }, { data: profiles }] = await Promise.all([
+      supabaseAdmin
+        .from("work_reports")
+        .select("id, number, user_number, created_at, user_id, data")
+        .order("number", { ascending: false }),
+      supabaseAdmin.from("profiles").select("id, username"),
+    ]);
 
     if (error) throw error;
 
+    const profileMap = Object.fromEntries(
+      (profiles ?? []).map((p) => [p.id, p.username])
+    );
+
     return {
-      reports: (data ?? []).map((r) => ({
-        id: r.id as string,
-        number: r.number as number,
-        user_number: r.user_number as number | null,
-        created_at: r.created_at as string,
-        cliente: String((r.data as { cliente?: string })?.cliente ?? ""),
-      })),
+      reports: (data ?? []).map((r) => {
+        const creatorFromProfile = r.user_id ? profileMap[r.user_id] : null;
+        const creatorFromData = String((r.data as any)?.tecnico ?? "").trim();
+        const creator = creatorFromProfile || creatorFromData || "Sin autor";
+
+        return {
+          id: r.id as string,
+          number: r.number as number,
+          user_number: r.user_number as number | null,
+          created_at: r.created_at as string,
+          cliente: String((r.data as { cliente?: string })?.cliente ?? ""),
+          creator,
+        };
+      }),
     };
   });
 

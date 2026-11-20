@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Hash, Pencil, X, Check, AlertCircle, Search } from "lucide-react";
+import { Hash, Pencil, X, Check, AlertCircle, Search, User, Calendar, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,11 +17,19 @@ type Report = {
   user_number: number | null;
   created_at: string;
   cliente: string;
+  creator: string;
 };
 
 function formatDate(iso: string) {
+  if (!iso) return "—";
   const d = new Date(iso);
   return d.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function formatTime(iso: string) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
 }
 
 export function ReportNumberAdmin() {
@@ -47,6 +55,7 @@ export function ReportNumberAdmin() {
     return reports.filter(
       (r) =>
         r.cliente.toLowerCase().includes(q) ||
+        (r.creator && r.creator.toLowerCase().includes(q)) ||
         String(r.user_number ?? r.number).includes(q)
     );
   }, [reports, search]);
@@ -155,8 +164,8 @@ export function ReportNumberAdmin() {
                     key={r.id}
                     className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors"
                   >
-                    {/* Number badge */}
-                    <div className="shrink-0">
+                    {/* Number badge and Creator */}
+                    <div className="flex items-center gap-1.5 shrink-0">
                       {r.user_number !== null ? (
                         <Badge className="bg-primary/10 text-primary border-primary/20 font-mono text-xs font-semibold">
                           Nº {displayNum}
@@ -166,14 +175,29 @@ export function ReportNumberAdmin() {
                           Nº {displayNum}
                         </Badge>
                       )}
+                      <span
+                        className="inline-flex items-center gap-1 text-xs font-medium text-foreground bg-muted/70 px-2 py-0.5 rounded-lg border border-border/60"
+                        title={`Creado por: ${r.creator || "Sin autor"}`}
+                      >
+                        <User className="h-3 w-3 text-primary shrink-0" />
+                        <span className="truncate max-w-[110px] sm:max-w-[150px]">
+                          {r.creator || "Sin autor"}
+                        </span>
+                      </span>
                     </div>
 
-                    {/* Client & date */}
+                    {/* Client & date + time */}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-foreground truncate">
                         {r.cliente || <span className="text-muted-foreground italic">Sin cliente</span>}
                       </p>
-                      <p className="text-xs text-muted-foreground">{formatDate(r.created_at)}</p>
+                      <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                        <Calendar className="h-3 w-3 text-muted-foreground/70 shrink-0" />
+                        <span>{formatDate(r.created_at)}</span>
+                        <span className="text-muted-foreground/40">·</span>
+                        <Clock className="h-3 w-3 text-muted-foreground/70 shrink-0" />
+                        <span>{formatTime(r.created_at)}</span>
+                      </p>
                     </div>
 
                     {/* Edit controls */}
