@@ -204,6 +204,7 @@ function Parte() {
     setSaving(true);
     try {
       const payload = r as unknown as Json;
+      const isAlreadyClosed = !!existing.data?.closed;
       let res;
       if (isNew) {
         // Get the next configured report number for this worker
@@ -226,13 +227,17 @@ function Parte() {
       } else {
         res = await supabase
           .from("work_reports")
-          .update({ data: payload, closed: false, updated_at: new Date().toISOString() })
+          .update({
+            data: payload,
+            closed: isAlreadyClosed,
+            updated_at: new Date().toISOString(),
+          })
           .eq("id", id)
           .select("id, number, user_number")
           .single();
       }
       if (res.error) throw res.error;
-      toast.success("Borrador guardado");
+      toast.success(isAlreadyClosed ? "Cambios guardados sin enviar" : "Borrador guardado");
       qc.invalidateQueries({ queryKey: ["work-reports"] });
       qc.invalidateQueries({ queryKey: ["work-report", res.data.id] });
       if (isNew) notifyFn({ data: { event: "new_report", id: res.data.id } }).catch(() => {});
