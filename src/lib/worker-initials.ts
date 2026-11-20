@@ -1,5 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
+import { getWorkerInitialsServer } from "@/lib/reports.functions";
 
 const LOCAL_STORAGE_KEY = "gruper_worker_initials_cache";
 
@@ -33,7 +35,7 @@ function setLocalCache(map: Record<string, string>) {
  */
 export function formatReportNumber(
   initials?: string | null,
-  yearOrDate?: string | number | null,
+  yearOrDate?: string | number | Date | null,
   num?: number | string | null
 ): string {
   if (num === null || num === undefined || num === "") return "";
@@ -44,8 +46,10 @@ export function formatReportNumber(
   if (yearOrDate) {
     if (typeof yearOrDate === "number" && yearOrDate > 1900 && yearOrDate < 2100) {
       year = yearOrDate;
+    } else if (yearOrDate instanceof Date) {
+      if (!isNaN(yearOrDate.getTime())) year = yearOrDate.getFullYear();
     } else {
-      const parsed = new Date(yearOrDate);
+      const parsed = new Date(yearOrDate as string);
       if (!isNaN(parsed.getTime()) && parsed.getFullYear() > 1900) {
         year = parsed.getFullYear();
       }
@@ -67,16 +71,21 @@ export type WorkerProfileInfo = {
 
 /**
  * Hook to query all worker profiles and their initials.
+ * Reads initials from: 1) server (client_equipment) 2) localStorage cache 3) username fallback
  */
 export function useWorkerInitials() {
+  const getInitialsFn = useServerFn(getWorkerInitialsServer);
+
   const query = useQuery({
     queryKey: ["worker-initials"],
     queryFn: async () => {
       const cache = getLocalCache();
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .order("username");
+
+      // Fetch profiles and server-stored initials in parallel
+      const [{ data, error }, serverInitials] = await Promise.all([
+        supabase.from("profiles").select("*").order("username"),
+        getInitialsFn().catch(() => ({ map: {} as Record<string, string> })),
+      ]);
 
       if (error) {
         console.warn("Error fetching profiles:", error.message);
@@ -91,18 +100,23 @@ export function useWorkerInitials() {
 
       for (const p of data ?? []) {
         const item = p as any;
-        const dbInit = item.initials?.trim() || "";
-        const finalInit = dbInit || map[item.id] || item.username.slice(0, 2).toUpperCase();
-        map[item.id] = finalInit;
+        // Priority: server DB > profiles.initials column > localStorage > username slice
+        const dbInit =
+          serverInitials.map[item.id] ||
+          item.initials?.trim() ||
+          map[item.id] ||
+          item.username.slice(0, 2).toUpperCase();
+
+        map[item.id] = dbInit;
 
         list.push({
           id: item.id,
           username: item.username,
-          initials: finalInit,
+          initials: dbInit,
         });
       }
 
-      // Update local cache
+      // Update local cache with fresh server data
       setLocalCache(map);
 
       return { list, map };
@@ -131,29 +145,23 @@ export function useWorkerInitials() {
 }
 
 /**
- * Saves worker initials both to Supabase profiles table and to local cache.
+ * Saves worker initials — now uses server function (client_equipment) for persistence.
+ * Also updates the local cache immediately.
  */
-export async function saveWorkerInitials(userId: string, initials: string) {
+export async function saveWorkerInitials(
+  userId: string,
+  initials: string,
+  serverFn: (args: { data: { userId: string; initials: string } }) => Promise<any>
+) {
   const clean = initials.trim().toUpperCase();
 
-  // Save to local cache first for instant feedback
+  // Update local cache immediately for instant UI feedback
   const cache = getLocalCache();
   cache[userId] = clean;
   setLocalCache(cache);
 
-  // Update in Supabase
-  try {
-    const { error } = await supabase
-      .from("profiles")
-      .update({ initials: clean } as any)
-      .eq("id", userId);
-
-    if (error) {
-      console.warn("Could not persist initials to profiles table (needs migration):", error.message);
-    }
-  } catch (err) {
-    console.warn("Error updating initials in Supabase:", err);
-  }
+  // Persist to server (client_equipment table)
+  await serverFn({ data: { userId, initials: clean } });
 
   return clean;
 }

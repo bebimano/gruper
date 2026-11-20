@@ -38,14 +38,23 @@ export const sendReportEmail = createServerFn({ method: "POST" })
     const num = rep.user_number ?? rep.number;
     const cliente = String((rep.data as { cliente?: string })?.cliente ?? "").trim();
 
-    // Fetch creator profile username + initials
+    // Fetch creator profile username + initials (from client_equipment store)
     const { data: creatorProfile } = await context.supabase
       .from("profiles")
-      .select("username, initials")
+      .select("username")
       .eq("id", rep.user_id)
       .maybeSingle();
     const creatorName = creatorProfile?.username ? creatorProfile.username.trim() : "";
-    const initials = ((creatorProfile as any)?.initials?.trim() || creatorName.slice(0, 2)).toUpperCase();
+
+    // Load initials from client_equipment (__INITIALS__<userId>)
+    const initialsKey = `__INITIALS__${rep.user_id}`;
+    const { data: initialsRow } = await context.supabase
+      .from("client_equipment")
+      .select("num_serie")
+      .eq("client_name", initialsKey)
+      .maybeSingle();
+    const dbInitials = ((initialsRow as any)?.num_serie || "").trim().toUpperCase();
+    const initials = dbInitials || creatorName.slice(0, 2).toUpperCase();
 
     // Número formateado con iniciales: BM260001
     const formattedNum = fmtNum(initials, rep.created_at ?? null, num);

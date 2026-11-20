@@ -1,15 +1,17 @@
 import { useState, useEffect } from "react";
-import { User, Shield, Check, Save, Sparkles, Hash } from "lucide-react";
+import { User, Check, Save, Hash } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { useWorkerInitials, saveWorkerInitials, formatReportNumber } from "@/lib/worker-initials";
+import { saveWorkerInitialsServer } from "@/lib/reports.functions";
 
 export function WorkerInitialsAdmin() {
   const qc = useQueryClient();
   const { workerList, isLoading } = useWorkerInitials();
+  const saveInitialsFn = useServerFn(saveWorkerInitialsServer);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
 
@@ -24,7 +26,6 @@ export function WorkerInitialsAdmin() {
   }, [workerList]);
 
   const handleChange = (userId: string, val: string) => {
-    // Only allow letters, numbers and max 5 chars
     const cleaned = val.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 5);
     setDrafts((prev) => ({ ...prev, [userId]: cleaned }));
   };
@@ -33,10 +34,9 @@ export function WorkerInitialsAdmin() {
     const val = drafts[userId]?.trim() || "";
     setSavingId(userId);
     try {
-      await saveWorkerInitials(userId, val);
+      await saveWorkerInitials(userId, val, saveInitialsFn);
       toast.success(`Iniciales para ${username} guardadas: "${val}"`);
       qc.invalidateQueries({ queryKey: ["worker-initials"] });
-      qc.invalidateQueries({ queryKey: ["admin-clients"] });
     } catch (e) {
       toast.error("Error al guardar las iniciales");
     } finally {
@@ -55,7 +55,7 @@ export function WorkerInitialsAdmin() {
             Iniciales de Trabajadores y Numeración de Partes
           </h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Configura las iniciales de cada trabajador. Los partes se numerarán automáticamente con el formato:{" "}
+            Configura las iniciales de cada trabajador. Los partes se numerarán automáticamente con el formato{" "}
             <strong className="text-foreground">[INICIALES][AA][0001]</strong> (ej: BM260001)
           </p>
         </div>
@@ -119,7 +119,11 @@ export function WorkerInitialsAdmin() {
                   onClick={() => handleSave(w.id, w.username)}
                   className="h-9 px-3 gap-1.5"
                 >
-                  <Save className="h-3.5 w-3.5" />
+                  {savingId === w.id ? (
+                    <Check className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Save className="h-3.5 w-3.5" />
+                  )}
                   <span>Guardar</span>
                 </Button>
               </div>

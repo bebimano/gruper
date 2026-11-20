@@ -751,3 +751,71 @@ export const getMyClientReportsServer = createServerFn({ method: "POST" })
       totalHoursFormatted,
     };
   });
+
+/**
+ * Obtiene las iniciales de TODOS los trabajadores guardadas en client_equipment.
+ * Devuelve un mapa { [userId]: initials }
+ */
+export const getWorkerInitialsServer = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: rows } = await supabaseAdmin
+      .from("client_equipment")
+      .select("client_name, num_serie")
+      .like("client_name", "__INITIALS__%");
+
+    const map: Record<string, string> = {};
+    for (const r of rows ?? []) {
+      const userId = (r.client_name as string).replace("__INITIALS__", "");
+      const initials = String((r as any).num_serie || "").trim().toUpperCase();
+      if (userId && initials) map[userId] = initials;
+    }
+
+    return { map };
+  });
+
+/**
+ * Admin: Guarda las iniciales de un trabajador en client_equipment.
+ */
+export const saveWorkerInitialsServer = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({ userId: z.string().uuid(), initials: z.string().max(5) }).parse(d)
+  )
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: adminRole } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", context.userId)
+      .eq("role", "admin")
+      .maybeSingle();
+    if (!adminRole) throw new Error("No autorizado");
+
+    const key = `__INITIALS__${data.userId}`;
+    const clean = data.initials.trim().toUpperCase();
+
+    const { data: existing } = await supabaseAdmin
+      .from("client_equipment")
+      .select("id")
+      .eq("client_name", key)
+      .maybeSingle();
+
+    if (existing) {
+      const { error } = await supabaseAdmin
+        .from("client_equipment")
+        .update({ num_serie: clean } as any)
+        .eq("id", existing.id);
+      if (error) throw error;
+    } else {
+      const { error } = await supabaseAdmin
+        .from("client_equipment")
+        .insert({ client_name: key, tipo_maquina: "worker_initials", num_serie: clean } as any);
+      if (error) throw error;
+    }
+
+    return { ok: true, initials: clean };
+  });
