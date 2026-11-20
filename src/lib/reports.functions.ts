@@ -753,30 +753,6 @@ export const getMyClientReportsServer = createServerFn({ method: "POST" })
   });
 
 /**
- * Obtiene las iniciales de TODOS los trabajadores guardadas en client_equipment.
- * Devuelve un mapa { [userId]: initials }
- */
-export const getWorkerInitialsServer = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-    const { data: rows } = await supabaseAdmin
-      .from("client_equipment")
-      .select("client_name, num_serie")
-      .like("client_name", "__INITIALS__%");
-
-    const map: Record<string, string> = {};
-    for (const r of rows ?? []) {
-      const userId = (r.client_name as string).replace("__INITIALS__", "");
-      const initials = String((r as any).num_serie || "").trim().toUpperCase();
-      if (userId && initials) map[userId] = initials;
-    }
-
-    return { map };
-  });
-
-/**
  * Admin: Guarda las iniciales de un trabajador en client_equipment.
  */
 export const saveWorkerInitialsServer = createServerFn({ method: "POST" })

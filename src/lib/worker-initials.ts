@@ -1,7 +1,5 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { getWorkerInitialsServer } from "@/lib/reports.functions";
 
 const LOCAL_STORAGE_KEY = "gruper_worker_initials_cache";
 
@@ -19,18 +17,11 @@ function setLocalCache(map: Record<string, string>) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(map));
-  } catch (e) {
-    console.error("Error saving worker initials to localStorage:", e);
-  }
+  } catch {}
 }
 
 /**
- * Formats a report number in the custom company format:
- * [INICIALES][AÑO 2 DIGITOS][0001]
- * - Initials of the technician (e.g. "BM", "JR")
- * - 2-digit Year (e.g. "26" for 2026)
- * - 4-digit zero-padded sequential number (e.g. "0001", "0002", "0015")
- *
+ * Formats a report number: [INICIALES][AÑO 2 DIGITOS][0001]
  * Example: initials "BM", year 2026, num 1 => "BM260001"
  */
 export function formatReportNumber(
@@ -59,7 +50,6 @@ export function formatReportNumber(
   const cleanInit = (initials || "").trim().toUpperCase();
   const year2Digits = String(year).slice(-2);
   const seq = String(n).padStart(4, "0");
-
   return cleanInit ? `${cleanInit}${year2Digits}${seq}` : `${year2Digits}${seq}`;
 }
 
@@ -71,68 +61,65 @@ export type WorkerProfileInfo = {
 
 /**
  * Hook to query all worker profiles and their initials.
- * Reads initials from: 1) server (client_equipment) 2) localStorage cache 3) username fallback
+ * Reads initials from client_equipment (__INITIALS__<userId>) via a single Supabase call.
+ * Falls back to localStorage cache, then username slice.
  */
 export function useWorkerInitials() {
-  const getInitialsFn = useServerFn(getWorkerInitialsServer);
-
   const query = useQuery({
     queryKey: ["worker-initials"],
+    staleTime: 5 * 60 * 1000, // cache 5 min — no re-fetch on every render
     queryFn: async () => {
       const cache = getLocalCache();
 
-      // Fetch profiles and server-stored initials in parallel
-      const [{ data, error }, serverInitials] = await Promise.all([
-        supabase.from("profiles").select("*").order("username"),
-        getInitialsFn().catch(() => ({ map: {} as Record<string, string> })),
+      // Single parallel fetch: profiles + initials from client_equipment
+      const [{ data: profiles, error }, { data: initialsRows }] = await Promise.all([
+        supabase.from("profiles").select("id, username, initials").order("username"),
+        supabase
+          .from("client_equipment")
+          .select("client_name, num_serie")
+          .like("client_name", "__INITIALS__%"),
       ]);
 
       if (error) {
         console.warn("Error fetching profiles:", error.message);
-        return {
-          list: [] as WorkerProfileInfo[],
-          map: cache,
-        };
+        return { list: [] as WorkerProfileInfo[], map: cache };
+      }
+
+      // Build initials map from client_equipment store
+      const dbInitialsMap: Record<string, string> = {};
+      for (const row of initialsRows ?? []) {
+        const userId = (row.client_name as string).replace("__INITIALS__", "");
+        const val = String((row as any).num_serie || "").trim().toUpperCase();
+        if (userId && val) dbInitialsMap[userId] = val;
       }
 
       const list: WorkerProfileInfo[] = [];
       const map: Record<string, string> = { ...cache };
 
-      for (const p of data ?? []) {
+      for (const p of profiles ?? []) {
         const item = p as any;
-        // Priority: server DB > profiles.initials column > localStorage > username slice
-        const dbInit =
-          serverInitials.map[item.id] ||
+        // Priority: client_equipment store > profiles.initials column > localStorage > username
+        const finalInit =
+          dbInitialsMap[item.id] ||
           item.initials?.trim() ||
           map[item.id] ||
           item.username.slice(0, 2).toUpperCase();
 
-        map[item.id] = dbInit;
-
-        list.push({
-          id: item.id,
-          username: item.username,
-          initials: dbInit,
-        });
+        map[item.id] = finalInit;
+        list.push({ id: item.id, username: item.username, initials: finalInit });
       }
 
-      // Update local cache with fresh server data
       setLocalCache(map);
-
       return { list, map };
     },
   });
 
   const getInitials = (userId?: string, fallbackUsername?: string): string => {
-    if (!userId) {
-      return fallbackUsername ? fallbackUsername.slice(0, 2).toUpperCase() : "";
-    }
+    if (!userId) return fallbackUsername ? fallbackUsername.slice(0, 2).toUpperCase() : "";
     const fromQuery = query.data?.map[userId];
     if (fromQuery) return fromQuery.toUpperCase();
-
     const fromCache = getLocalCache()[userId];
     if (fromCache) return fromCache.toUpperCase();
-
     return fallbackUsername ? fallbackUsername.slice(0, 2).toUpperCase() : "";
   };
 
@@ -145,8 +132,7 @@ export function useWorkerInitials() {
 }
 
 /**
- * Saves worker initials — now uses server function (client_equipment) for persistence.
- * Also updates the local cache immediately.
+ * Saves worker initials via a server function (persists in client_equipment).
  */
 export async function saveWorkerInitials(
   userId: string,
@@ -155,13 +141,12 @@ export async function saveWorkerInitials(
 ) {
   const clean = initials.trim().toUpperCase();
 
-  // Update local cache immediately for instant UI feedback
+  // Update local cache immediately
   const cache = getLocalCache();
   cache[userId] = clean;
   setLocalCache(cache);
 
-  // Persist to server (client_equipment table)
+  // Persist to server
   await serverFn({ data: { userId, initials: clean } });
-
   return clean;
 }
