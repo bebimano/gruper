@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Plus, Printer, Trash2, X, Cpu, Download, Mail, Send, Clock, Car, FileText, Wrench } from "lucide-react";
+import { ArrowLeft, Plus, Printer, Trash2, X, Cpu, Download, Mail, Send, Clock, Car, FileText, Wrench, Save } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
@@ -659,30 +659,42 @@ function Parte() {
       <div className="fixed inset-x-0 bottom-0 border-t border-border bg-background/95 backdrop-blur px-4 sm:px-6 md:px-8 py-3 safe-bottom print:hidden">
         <div className="mx-auto max-w-4xl lg:max-w-5xl">
           {closed ? (
-            <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={sendEmail} disabled={sending}>
-                <Mail className="h-4 w-4 mr-1.5" /> {sending ? "Enviando…" : "Reenviar por correo"}
-              </Button>
-              {isAdmin ? (
-                <Button className="flex-1 font-semibold" onClick={handleStartClose} disabled={saving || sending}>
-                  <Send className="h-4 w-4 mr-1.5" />
-                  {saving ? "Guardando…" : sending ? "Enviando…" : "Guardar cambios y reenviar"}
+            <div className="flex flex-col gap-2">
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={sendEmail} disabled={sending}>
+                  <Mail className="h-4 w-4 mr-1.5" /> {sending ? "Enviando…" : "Reenviar por correo"}
                 </Button>
-              ) : existing.data?.edit_requested ? (
-                <Button variant="outline" className="flex-1 text-xs sm:text-sm" disabled>
-                  <Clock className="h-4 w-4 mr-1.5" /> Modificación solicitada
-                </Button>
-              ) : (
-                <Button variant="outline" className="flex-1 text-xs sm:text-sm font-medium" onClick={requestEdit}>
-                  Pedir modificar el parte
+                {isAdmin ? (
+                  <Button className="flex-1 font-semibold" onClick={handleStartClose} disabled={saving || sending}>
+                    <Send className="h-4 w-4 mr-1.5" />
+                    {saving ? "Guardando…" : sending ? "Enviando…" : "Guardar y reenviar"}
+                  </Button>
+                ) : existing.data?.edit_requested ? (
+                  <Button variant="outline" className="flex-1 text-xs sm:text-sm" disabled>
+                    <Clock className="h-4 w-4 mr-1.5" /> Modificación solicitada
+                  </Button>
+                ) : (
+                  <Button variant="outline" className="flex-1 text-xs sm:text-sm font-medium" onClick={requestEdit}>
+                    Pedir modificar el parte
+                  </Button>
+                )}
+              </div>
+              {isAdmin && (
+                <Button variant="outline" className="w-full font-medium" onClick={saveDraft} disabled={saving || sending}>
+                  <Save className="h-4 w-4 mr-1.5" />
+                  {saving ? "Guardando…" : "Guardar cambios sin enviar"}
                 </Button>
               )}
             </div>
           ) : (
             <div className="flex gap-2">
-              <Button className="w-full font-semibold" onClick={handleStartClose} disabled={saving || sending}>
+              <Button variant="outline" className="flex-1 font-medium" onClick={saveDraft} disabled={saving || sending}>
+                <Save className="h-4 w-4 mr-1.5" />
+                {saving ? "Guardando…" : "Guardar sin enviar"}
+              </Button>
+              <Button className="flex-1 font-semibold" onClick={handleStartClose} disabled={saving || sending}>
                 <Send className="h-4 w-4 mr-1.5" />
-                {saving ? "Cerrando parte…" : sending ? "Enviando correo…" : "Cerrar y enviar parte"}
+                {saving ? "Cerrando parte…" : sending ? "Enviando correo…" : "Cerrar y enviar"}
               </Button>
             </div>
           )}
