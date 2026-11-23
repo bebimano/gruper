@@ -118,21 +118,58 @@ export const getAllClientsAndEquipmentAdminServer = createServerFn({ method: "PO
       throw new Error("Acceso restringido a Administradores.");
     }
 
-    const [{ data: profiles }, { data: contacts }, { data: equipmentRows }] = await Promise.all([
-      supabaseAdmin.from("profiles").select("id, username").order("username"),
+    const [
+      { data: profiles },
+      { data: contacts },
+      { data: equipmentRows },
+      { data: userTypeRows },
+      { data: adminRoles },
+    ] = await Promise.all([
+      supabaseAdmin.from("profiles").select("id, username, can_work_reports").order("username"),
       supabaseAdmin.from("report_contacts").select("name").order("name"),
       supabaseAdmin
         .from("client_equipment")
         .select("id, client_name, tipo_maquina, modelo, num_serie, direccion, poblacion")
         .order("client_name")
         .order("tipo_maquina"),
+      supabaseAdmin
+        .from("client_equipment")
+        .select("client_name, num_serie")
+        .like("client_name", "__USER_TYPE__%"),
+      supabaseAdmin.from("user_roles").select("user_id").eq("role", "admin"),
     ]);
 
+    const adminUserIds = new Set((adminRoles ?? []).map((a) => a.user_id));
+    const userTypeMap = new Map<string, "worker" | "client">();
+    for (const r of userTypeRows ?? []) {
+      const uid = (r.client_name as string).replace("__USER_TYPE__", "");
+      const val = String((r as any).num_serie || "").trim().toLowerCase();
+      if (val === "worker" || val === "client") {
+        userTypeMap.set(uid, val);
+      }
+    }
+
+    // Identificar qué usuarios son trabajadores (nunca deben aparecer en equipos)
+    const workerUsernames = new Set<string>();
+    for (const p of profiles ?? []) {
+      const explicit = userTypeMap.get(p.id);
+      const isAdmin = adminUserIds.has(p.id);
+      const isWorker =
+        explicit === "worker" || (!explicit && (isAdmin || !!(p as any).can_work_reports));
+      if (isWorker && p.username) {
+        workerUsernames.add(p.username.trim().toLowerCase());
+      }
+    }
+
+    // Máquinas reales dadas de alta (sin metadatos internos)
     const validEquipment = (equipmentRows ?? []).filter(
-      (r) => !r.client_name.startsWith("__") && !r.client_name.startsWith("AVERIA_")
+      (r) =>
+        !r.client_name.startsWith("__") &&
+        !r.client_name.startsWith("AVERIA_") &&
+        !workerUsernames.has(r.client_name.trim().toLowerCase())
     );
 
-    // Mapear equipos por nombre de cliente
+    // Mapear equipos exclusivamente por nombre de cliente que tenga máquinas
     const equipmentByClient = new Map<string, ClientEquipmentItem[]>();
     for (const r of validEquipment) {
       const key = r.client_name.trim();
@@ -154,57 +191,63 @@ export const getAllClientsAndEquipmentAdminServer = createServerFn({ method: "PO
       });
     }
 
-    // Unificar lista de clientes
+    // Clientes registrados en la app que NO son trabajadores
+    const registeredClientsSet = new Set(
+      (profiles ?? [])
+        .filter((p) => {
+          const explicit = userTypeMap.get(p.id);
+          const isAdmin = adminUserIds.has(p.id);
+          const isWorker =
+            explicit === "worker" || (!explicit && (isAdmin || !!(p as any).can_work_reports));
+          return !isWorker;
+        })
+        .map((p) => (p.username || "").trim().toLowerCase())
+        .filter(Boolean)
+    );
+
+    // ÚNICAMENTE clientes que tengan máquinas dadas de alta
+    // Los trabajadores y usuarios con 0 máquinas NO aparecen
     const clientsMap = new Map<string, ClientAssignmentSummary>();
 
-    // 1. Usuarios registrados en la app
-    for (const p of profiles ?? []) {
-      const name = (p.username || "").trim();
-      if (!name) continue;
-      const machines = equipmentByClient.get(name) ?? [];
-      clientsMap.set(name, {
-        name,
-        username: name,
-        isRegisteredUser: true,
+    for (const [cName, machines] of equipmentByClient.entries()) {
+      if (machines.length === 0) continue;
+      clientsMap.set(cName, {
+        name: cName,
+        username: registeredClientsSet.has(cName.toLowerCase()) ? cName : undefined,
+        isRegisteredUser: registeredClientsSet.has(cName.toLowerCase()),
         machinesCount: machines.length,
         machines,
       });
-    }
-
-    // 2. Contactos de partes
-    for (const c of contacts ?? []) {
-      const name = (c.name || "").trim();
-      if (!name) continue;
-      if (!clientsMap.has(name)) {
-        const machines = equipmentByClient.get(name) ?? [];
-        clientsMap.set(name, {
-          name,
-          isRegisteredUser: false,
-          machinesCount: machines.length,
-          machines,
-        });
-      }
-    }
-
-    // 3. Clientes que tengan equipos pero no estén en profiles ni contacts
-    for (const [cName, machines] of equipmentByClient.entries()) {
-      if (!clientsMap.has(cName)) {
-        clientsMap.set(cName, {
-          name: cName,
-          isRegisteredUser: false,
-          machinesCount: machines.length,
-          machines,
-        });
-      }
     }
 
     const clientsList = Array.from(clientsMap.values()).sort((a, b) =>
       a.name.localeCompare(b.name, "es-ES")
     );
 
+    // Sugerencias de clientes para el desplegable de asignación (excluyendo trabajadores)
+    const availableClientSuggestions = Array.from(
+      new Set([
+        ...Array.from(clientsMap.keys()),
+        ...(contacts ?? []).map((c) => (c.name || "").trim()).filter(Boolean),
+        ...(profiles ?? [])
+          .filter((p) => {
+            const explicit = userTypeMap.get(p.id);
+            const isAdmin = adminUserIds.has(p.id);
+            const isWorker =
+              explicit === "worker" || (!explicit && (isAdmin || !!(p as any).can_work_reports));
+            return !isWorker;
+          })
+          .map((p) => (p.username || "").trim())
+          .filter(Boolean),
+      ])
+    )
+      .filter((name) => !workerUsernames.has(name.toLowerCase()))
+      .sort((a, b) => a.localeCompare(b, "es-ES"));
+
     return {
       clients: clientsList,
       totalMachines: validEquipment.length,
+      availableClientSuggestions,
     };
   });
 

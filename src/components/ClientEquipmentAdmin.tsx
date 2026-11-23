@@ -232,10 +232,8 @@ export function ClientEquipmentAdmin() {
               className="h-10 text-sm font-medium"
             />
             <datalist id="admin-all-clients-list">
-              {clients.map((c) => (
-                <option key={c.name} value={c.name}>
-                  {c.name} {c.isRegisteredUser ? "(Usuario registrado)" : ""}
-                </option>
+              {(clientsQuery.data?.availableClientSuggestions ?? clients.map((c) => c.name)).map((name) => (
+                <option key={name} value={name} />
               ))}
             </datalist>
           </div>
