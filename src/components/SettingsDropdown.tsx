@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "@tanstack/react-router";
 import {
   Settings,
   ChevronDown,
@@ -26,7 +25,6 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
@@ -144,31 +142,42 @@ export function SettingsDropdown({
   onTabSelect,
 }: SettingsDropdownProps) {
   const me = useMe();
-  const navigate = useNavigate();
-  const location = useLocation();
   const [open, setOpen] = useState(false);
+  const [currentPath, setCurrentPath] = useState("");
 
-  // Solo visible para usuarios con rol administrador
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setCurrentPath(window.location.pathname);
+    }
+  }, [open]);
+
+  // Solo visible para administradores
   if (!me.data?.isAdmin) return null;
 
-  const isCurrentAdminPage = location.pathname === "/admin";
+  const isCurrentAdminPage = currentPath === "/admin";
 
   const handleSelectTab = (tabValue: string) => {
     setOpen(false);
 
     // Notificar cambio inmediato en la página si estamos en /admin
-    window.dispatchEvent(
-      new CustomEvent("gruper:switch-admin-tab", { detail: tabValue })
-    );
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("gruper:switch-admin-tab", { detail: tabValue })
+      );
+
+      if (window.location.pathname === "/admin") {
+        const url = new URL(window.location.href);
+        url.searchParams.set("tab", tabValue);
+        window.history.replaceState({}, "", url.toString());
+      } else {
+        window.location.href = `/admin?tab=${encodeURIComponent(tabValue)}`;
+        return;
+      }
+    }
 
     if (onTabSelect) {
       onTabSelect(tabValue);
     }
-
-    navigate({
-      to: "/admin",
-      search: { tab: tabValue },
-    });
   };
 
   const renderCategory = (

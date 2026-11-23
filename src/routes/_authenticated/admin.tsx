@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, useEffect } from "react";
@@ -24,6 +24,7 @@ import {
   HardHat,
   Search,
   UserCheck,
+  Settings,
 } from "lucide-react";
 import { GreetingWeatherCard } from "@/components/GreetingWeatherCard";
 import { SettingsDropdown } from "@/components/SettingsDropdown";
@@ -104,9 +105,6 @@ function EditRequests() {
 }
 
 export const Route = createFileRoute("/_authenticated/admin")({
-  validateSearch: (search: Record<string, unknown>) => ({
-    tab: typeof search.tab === "string" ? search.tab : undefined,
-  }),
   head: () => ({
     meta: [
       { title: "Administración — Gruper Remote" },
@@ -137,18 +135,18 @@ const ADMIN_TABS = [
   { value: "notify", label: "Avisos", icon: Bell },
 ] as const;
 
+function getInitialTab(): string {
+  if (typeof window !== "undefined") {
+    const params = new URLSearchParams(window.location.search);
+    const t = params.get("tab");
+    if (t) return t;
+  }
+  return "machines";
+}
+
 function Admin() {
   const me = useMe();
-  const search = Route.useSearch();
-  const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<string>(() => search.tab || "machines");
-
-  // Sincronizar si cambia el search param ?tab=xxx
-  useEffect(() => {
-    if (search.tab && search.tab !== activeTab) {
-      setActiveTab(search.tab);
-    }
-  }, [search.tab]);
+  const [activeTab, setActiveTab] = useState<string>(getInitialTab);
 
   // Escuchar eventos globales del desplegable para cambio instantáneo
   useEffect(() => {
@@ -164,11 +162,11 @@ function Admin() {
 
   const handleTabChange = (val: string) => {
     setActiveTab(val);
-    navigate({
-      to: "/admin",
-      search: { tab: val },
-      replace: true,
-    });
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", val);
+      window.history.replaceState({}, "", url.toString());
+    }
   };
 
   if (me.isLoading) return null;
@@ -205,49 +203,32 @@ function Admin() {
         />
       </div>
 
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="mt-5 space-y-4">
-        {/* Selector rápido para móviles (< md) */}
-        <div className="md:hidden rounded-2xl border border-border/80 bg-card/90 backdrop-blur p-2.5 shadow-2xs flex items-center gap-2">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-1 shrink-0">
-            Sección:
-          </span>
-          <select
-            value={activeTab}
-            onChange={(e) => handleTabChange(e.target.value)}
-            className="flex-1 bg-muted/60 border border-border/80 rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
-          >
-            {ADMIN_TABS.map((tab) => (
-              <option key={tab.value} value={tab.value}>
-                {tab.label}
-              </option>
-            ))}
-          </select>
+      {/* Título limpio de la sección activa (sustituye a la barra horizontal para dar más espacio) */}
+      <div className="mt-5 flex items-center justify-between pb-2 border-b border-border/60">
+        <div className="flex items-center gap-2.5">
+          {(() => {
+            const currentTab = ADMIN_TABS.find((t) => t.value === activeTab);
+            const Icon = currentTab?.icon || Settings;
+            return (
+              <>
+                <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                  <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-foreground leading-tight">
+                    {currentTab?.label || "Ajustes"}
+                  </h2>
+                  <span className="text-[11px] text-muted-foreground leading-tight">
+                    Administración y configuración
+                  </span>
+                </div>
+              </>
+            );
+          })()}
         </div>
+      </div>
 
-        {/* Menú de pestañas industrial auto-ajustable con scroll suave y píldoras táctiles */}
-        <div className="w-full overflow-hidden rounded-2xl border border-border/80 bg-card/85 backdrop-blur p-1.5 shadow-2xs">
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth py-0.5 px-0.5">
-            {ADMIN_TABS.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.value;
-              return (
-                <button
-                  key={tab.value}
-                  type="button"
-                  onClick={() => handleTabChange(tab.value)}
-                  className={`whitespace-nowrap px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
-                    isActive
-                      ? "bg-primary text-primary-foreground border border-primary/40 shadow-[0_2px_8px_rgba(37,159,253,0.35)] font-bold"
-                      : "bg-muted/40 hover:bg-muted text-foreground/80 hover:text-foreground border border-border/40"
-                  }`}
-                >
-                  <Icon className={`h-4 w-4 shrink-0 ${isActive ? "text-primary-foreground" : "text-primary"}`} />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="mt-4 space-y-4">
         <TabsContent value="machines"><MachinesAdmin /></TabsContent>
         <TabsContent value="clients">
           <ClientsAdmin myId={me.data.id} />

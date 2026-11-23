@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
   Monitor,
@@ -34,7 +34,6 @@ export const Route = createFileRoute("/_authenticated/maquinas")({
 });
 
 function Machines() {
-  const navigate = useNavigate();
   const me = useMe();
   const machines = useQuery({
     queryKey: ["machines", me.data?.id],
@@ -52,7 +51,7 @@ function Machines() {
 
   async function logout() {
     await supabase.auth.signOut();
-    navigate({ to: "/" });
+    window.location.href = "/";
   }
 
   const machinesList = machines.data ?? [];
