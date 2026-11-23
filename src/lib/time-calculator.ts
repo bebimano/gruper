@@ -102,6 +102,27 @@ export function syncDayWorkIntervals(day: Dia): Dia {
 }
 
 /**
+ * Computes work time and kilometers for a single day.
+ */
+export function calculateDayTotals(d: Dia) {
+  const travelMinutes = durationMinutes(d.idaDe, d.idaA) + durationMinutes(d.vueltaDe, d.vueltaA);
+  let workMinutes = 0;
+  if (d.idaA && d.vueltaDe) {
+    workMinutes = durationMinutes(d.idaA, d.vueltaDe);
+  } else {
+    workMinutes = durationMinutes(d.mananaDe, d.mananaA) + durationMinutes(d.tardeDe, d.tardeA);
+  }
+  const km = parseKm(d.kmIda) + parseKm(d.kmVuelta);
+  return {
+    workMinutes,
+    formattedWorkHours: formatMinutes(workMinutes),
+    travelMinutes,
+    formattedTravelHours: formatMinutes(travelMinutes),
+    totalKm: Math.round(km * 10) / 10,
+  };
+}
+
+/**
  * Computes total work time (morning + afternoon intervals) and total kilometers
  * across all days registered in the report.
  */
