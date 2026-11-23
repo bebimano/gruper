@@ -71,13 +71,23 @@ export function useWorkerInitials() {
     queryFn: async () => {
       const cache = getLocalCache();
 
-      // Single parallel fetch: profiles + initials from client_equipment
-      const [{ data: profiles, error }, { data: initialsRows }] = await Promise.all([
-        supabase.from("profiles").select("id, username, initials").order("username"),
+      // Single parallel fetch: profiles + initials + user types + roles
+      const [
+        { data: profiles, error },
+        { data: initialsRows },
+        { data: userTypeRows },
+        { data: roles },
+      ] = await Promise.all([
+        supabase.from("profiles").select("id, username, initials, can_work_reports").order("username"),
         supabase
           .from("client_equipment")
           .select("client_name, num_serie")
           .like("client_name", "__INITIALS__%"),
+        supabase
+          .from("client_equipment")
+          .select("client_name, num_serie")
+          .like("client_name", "__USER_TYPE__%"),
+        supabase.from("user_roles").select("user_id, role"),
       ]);
 
       if (error) {
@@ -93,6 +103,15 @@ export function useWorkerInitials() {
         if (userId && val) dbInitialsMap[userId] = val;
       }
 
+      // Build user types map and admin set to filter workers
+      const adminSet = new Set((roles ?? []).filter((r) => r.role === "admin").map((r) => r.user_id));
+      const userTypeMap: Record<string, string> = {};
+      for (const row of userTypeRows ?? []) {
+        const userId = (row.client_name as string).replace("__USER_TYPE__", "");
+        const val = String((row as any).num_serie || "").trim().toLowerCase();
+        if (userId && val) userTypeMap[userId] = val;
+      }
+
       const list: WorkerProfileInfo[] = [];
       const map: Record<string, string> = { ...cache };
 
@@ -106,7 +125,16 @@ export function useWorkerInitials() {
           item.username.slice(0, 2).toUpperCase();
 
         map[item.id] = finalInit;
-        list.push({ id: item.id, username: item.username, initials: finalInit });
+
+        // Solo incluir en la lista de trabajadores a los que sean trabajadores o administradores
+        const explicit = userTypeMap[item.id];
+        const isAdmin = adminSet.has(item.id);
+        const isWorker =
+          explicit === "worker" || (!explicit && (isAdmin || !!item.can_work_reports));
+
+        if (isWorker) {
+          list.push({ id: item.id, username: item.username, initials: finalInit });
+        }
       }
 
       setLocalCache(map);

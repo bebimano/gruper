@@ -21,12 +21,21 @@ import {
   Package,
   ShieldCheck,
   Mail,
+  HardHat,
+  Search,
+  UserCheck,
 } from "lucide-react";
 import { GreetingWeatherCard } from "@/components/GreetingWeatherCard";
 import { checkMachinesStatus } from "@/lib/machines.functions";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { createUserAccount, deleteClientUser, resetClientPassword, setUserRole } from "@/lib/users.functions";
+import {
+  createUserAccount,
+  deleteClientUser,
+  resetClientPassword,
+  setUserRole,
+  setUserTypeServer,
+} from "@/lib/users.functions";
 import { useMe } from "@/lib/useRole";
 import {
   getAllAllowedAveriasClients,
@@ -440,6 +449,7 @@ function ClientsAdmin({ myId }: { myId: string }) {
   const deleteFn = useServerFn(deleteClientUser);
   const resetFn = useServerFn(resetClientPassword);
   const setRoleFn = useServerFn(setUserRole);
+  const setUserTypeFn = useServerFn(setUserTypeServer);
   const setAveriasFn = useServerFn(setClientAveriasAccess);
   const getAllAllowedFn = useServerFn(getAllAllowedAveriasClients);
   const getAveriaRecipientsFn = useServerFn(getAveriaNotifyRecipients);
@@ -448,7 +458,9 @@ function ClientsAdmin({ myId }: { myId: string }) {
   const setJobCreatorFn = useServerFn(setUserCanCreateJobs);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [newRole, setNewRole] = useState<"admin" | "client">("client");
+  const [newAccountType, setNewAccountType] = useState<"client" | "worker" | "admin">("client");
+  const [filterType, setFilterType] = useState<"all" | "worker" | "client">("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const clients = useQuery({
     queryKey: ["admin-clients"],
@@ -457,6 +469,7 @@ function ClientsAdmin({ myId }: { myId: string }) {
         { data: profiles },
         { data: access },
         { data: roles },
+        { data: userTypeRows },
         allowedAveriasList,
         notifyRecipientsList,
         jobCreatorsList,
@@ -464,6 +477,7 @@ function ClientsAdmin({ myId }: { myId: string }) {
         supabase.from("profiles").select("*").order("username"),
         supabase.from("machine_access").select("user_id, machine_id"),
         supabase.from("user_roles").select("user_id, role"),
+        supabase.from("client_equipment").select("client_name, num_serie").like("client_name", "__USER_TYPE__%"),
         getAllAllowedFn().catch(() => []),
         getAveriaRecipientsFn().catch(() => []),
         getJobCreatorsFn().catch(() => []),
@@ -472,11 +486,24 @@ function ClientsAdmin({ myId }: { myId: string }) {
       const notifyRecipients = new Set(notifyRecipientsList ?? []);
       const jobCreators = new Set(jobCreatorsList ?? []);
       const roleMap = new Map((roles ?? []).map((r) => [r.user_id, r.role]));
+      const userTypeMap = new Map<string, "worker" | "client">();
+      for (const r of userTypeRows ?? []) {
+        const uid = (r.client_name as string).replace("__USER_TYPE__", "");
+        const val = String((r as any).num_serie || "").trim().toLowerCase();
+        if (val === "worker" || val === "client") {
+          userTypeMap.set(uid, val);
+        }
+      }
+
       return (profiles ?? []).filter((p) => p.id !== myId).map((p) => {
         const item = p as any;
         const isAdminUser = roleMap.get(item.id) === "admin";
+        const explicitType = userTypeMap.get(item.id);
+        const userType: "worker" | "client" = explicitType ?? (isAdminUser || item.can_work_reports ? "worker" : "client");
+
         return {
           ...item,
+          userType,
           can_view_all_reports: !!item.can_view_all_reports,
           can_averias: !!item.can_averias || allowedAverias.has(item.id),
           can_create_jobs: isAdminUser || !!item.can_create_jobs || jobCreators.has(item.id),
@@ -488,6 +515,19 @@ function ClientsAdmin({ myId }: { myId: string }) {
       });
     },
   });
+
+  async function changeUserType(id: string, name: string, targetType: "worker" | "client") {
+    try {
+      await setUserTypeFn({ data: { userId: id, userType: targetType } });
+      toast.success(`${name} clasificado como ${targetType === "worker" ? "Trabajador" : "Cliente"}`);
+      qc.invalidateQueries({ queryKey: ["admin-clients"] });
+      qc.invalidateQueries({ queryKey: ["admin-client-reports-summary"] });
+      qc.invalidateQueries({ queryKey: ["worker-initials"] });
+      qc.invalidateQueries({ queryKey: ["worker-report-config"] });
+    } catch (e) {
+      err(e);
+    }
+  }
 
   async function toggleCreateJobs(id: string, on: boolean) {
     try {
@@ -524,11 +564,24 @@ function ClientsAdmin({ myId }: { myId: string }) {
   async function add(e: React.FormEvent) {
     e.preventDefault();
     try {
-      await createFn({ data: { username, password, role: newRole } });
-      toast.success(`Usuario ${username} creado como ${newRole === "admin" ? "Administrador" : "Cliente"}`);
-      setUsername(""); setPassword(""); setNewRole("client");
+      const role = newAccountType === "admin" ? "admin" : "client";
+      const userType = newAccountType === "client" ? "client" : "worker";
+      await createFn({ data: { username, password, role, userType } });
+      toast.success(
+        `Usuario ${username} creado como ${
+          newAccountType === "admin"
+            ? "Administrador"
+            : newAccountType === "worker"
+            ? "Trabajador"
+            : "Cliente"
+        }`
+      );
+      setUsername(""); setPassword(""); setNewAccountType("client");
       qc.invalidateQueries({ queryKey: ["admin-clients"] });
       qc.invalidateQueries({ queryKey: ["admin-client-list"] });
+      qc.invalidateQueries({ queryKey: ["admin-client-reports-summary"] });
+      qc.invalidateQueries({ queryKey: ["worker-initials"] });
+      qc.invalidateQueries({ queryKey: ["worker-report-config"] });
     } catch (e) { err(e); }
   }
   async function toggleRole(id: string, name: string, targetRole: "admin" | "client") {
@@ -546,6 +599,9 @@ function ClientsAdmin({ myId }: { myId: string }) {
       toast.success(`${name} ahora es ${isPromoting ? "Administrador" : "Cliente"}`);
       qc.invalidateQueries({ queryKey: ["admin-clients"] });
       qc.invalidateQueries({ queryKey: ["admin-client-list"] });
+      qc.invalidateQueries({ queryKey: ["admin-client-reports-summary"] });
+      qc.invalidateQueries({ queryKey: ["worker-initials"] });
+      qc.invalidateQueries({ queryKey: ["worker-report-config"] });
     } catch (e) {
       err(e);
     }
@@ -568,6 +624,9 @@ function ClientsAdmin({ myId }: { myId: string }) {
       await deleteFn({ data: { id } });
       qc.invalidateQueries({ queryKey: ["admin-clients"] });
       qc.invalidateQueries({ queryKey: ["admin-client-list"] });
+      qc.invalidateQueries({ queryKey: ["admin-client-reports-summary"] });
+      qc.invalidateQueries({ queryKey: ["worker-initials"] });
+      qc.invalidateQueries({ queryKey: ["worker-report-config"] });
     } catch (e) { err(e); }
   }
   async function reset(id: string) {
@@ -576,62 +635,273 @@ function ClientsAdmin({ myId }: { myId: string }) {
     try { await resetFn({ data: { id, password: pw } }); toast.success("Contraseña cambiada"); } catch (e) { err(e); }
   }
 
+  const allClientsList = clients.data ?? [];
+  const totalWorkers = allClientsList.filter((c) => c.userType === "worker").length;
+  const totalClients = allClientsList.filter((c) => c.userType === "client").length;
+
+  const filteredList = allClientsList.filter((c) => {
+    if (filterType === "worker" && c.userType !== "worker") return false;
+    if (filterType === "client" && c.userType !== "client") return false;
+    if (searchQuery.trim() && !c.username.toLowerCase().includes(searchQuery.toLowerCase().trim())) {
+      return false;
+    }
+    return true;
+  });
+
   return (
     <div className="space-y-4 mt-4">
-      <form onSubmit={add} className="space-y-3 rounded-xl border border-border bg-background p-4">
-        <h2 className="font-medium">Nuevo usuario</h2>
-        <Input placeholder="Usuario" value={username} onChange={(e) => setUsername(e.target.value)} required autoCapitalize="none" />
-        <Input placeholder="Contraseña" value={password} onChange={(e) => setPassword(e.target.value)} required />
+      {/* Formulario nuevo usuario con selector claro de 3 tipos */}
+      <form onSubmit={add} className="space-y-3 rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-xs">
+        <div className="flex items-center gap-2 text-foreground font-semibold">
+          <Users className="h-5 w-5 text-primary" />
+          <span>Alta de nuevo usuario</span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Input placeholder="Nombre de usuario" value={username} onChange={(e) => setUsername(e.target.value)} required autoCapitalize="none" />
+          <Input placeholder="Contraseña" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        </div>
 
         <div className="space-y-1.5 pt-1">
-          <label className="text-xs font-medium text-muted-foreground">Tipo de cuenta / Nivel de acceso:</label>
-          <div className="grid grid-cols-2 gap-2">
+          <label className="text-xs font-semibold text-muted-foreground">¿Qué tipo de usuario es?:</label>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            {/* Opción 1: Cliente */}
             <button
               type="button"
-              onClick={() => setNewRole("client")}
-              className={`rounded-lg border p-2.5 text-left text-sm transition-colors ${
-                newRole === "client"
-                  ? "border-primary bg-primary/10 font-medium text-primary ring-1 ring-primary"
+              onClick={() => setNewAccountType("client")}
+              className={`rounded-xl border p-3 text-left transition-all cursor-pointer ${
+                newAccountType === "client"
+                  ? "border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-2 ring-emerald-500/30 font-semibold shadow-xs"
                   : "border-border text-muted-foreground hover:bg-muted"
               }`}
             >
-              <div className="font-medium text-foreground">Cliente / Operario</div>
-              <div className="text-xs text-muted-foreground">Acceso solo a opciones y máquinas asignadas</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => setNewRole("admin")}
-              className={`rounded-lg border p-2.5 text-left text-sm transition-colors ${
-                newRole === "admin"
-                  ? "border-primary bg-primary/10 font-medium text-primary ring-1 ring-primary"
-                  : "border-border text-muted-foreground hover:bg-muted"
-              }`}
-            >
-              <div className="flex items-center gap-1.5 font-medium text-foreground">
-                <Shield className="h-3.5 w-3.5 text-primary" /> Administrador
+              <div className="flex items-center gap-2 font-bold text-foreground">
+                <Building2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                <span>Cliente</span>
               </div>
-              <div className="text-xs text-muted-foreground">Acceso total a todas las opciones de la app</div>
+              <div className="text-[11px] text-muted-foreground mt-1 leading-snug">
+                Empresa cliente. Accede a sus máquinas, avisos de averías y partes.
+              </div>
+            </button>
+
+            {/* Opción 2: Trabajador */}
+            <button
+              type="button"
+              onClick={() => setNewAccountType("worker")}
+              className={`rounded-xl border p-3 text-left transition-all cursor-pointer ${
+                newAccountType === "worker"
+                  ? "border-primary bg-primary/10 text-primary ring-2 ring-primary/30 font-semibold shadow-xs"
+                  : "border-border text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              <div className="flex items-center gap-2 font-bold text-foreground">
+                <HardHat className="h-4 w-4 text-primary" />
+                <span>Trabajador / Técnico</span>
+              </div>
+              <div className="text-[11px] text-muted-foreground mt-1 leading-snug">
+                Personal técnico propio. Realiza partes de trabajo y tareas asignadas.
+              </div>
+            </button>
+
+            {/* Opción 3: Administrador */}
+            <button
+              type="button"
+              onClick={() => setNewAccountType("admin")}
+              className={`rounded-xl border p-3 text-left transition-all cursor-pointer ${
+                newAccountType === "admin"
+                  ? "border-primary bg-primary/10 text-primary ring-2 ring-primary/30 font-semibold shadow-xs"
+                  : "border-border text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              <div className="flex items-center gap-2 font-bold text-foreground">
+                <Shield className="h-4 w-4 text-primary" />
+                <span>Administrador</span>
+              </div>
+              <div className="text-[11px] text-muted-foreground mt-1 leading-snug">
+                Control total de administración, técnicos, clientes y ajustes.
+              </div>
             </button>
           </div>
         </div>
 
-        <Button type="submit" className="w-full">Crear usuario</Button>
+        <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl h-10 shadow-xs">
+          Crear {newAccountType === "admin" ? "Administrador" : newAccountType === "worker" ? "Trabajador" : "Cliente"}
+        </Button>
       </form>
-      {clients.data?.map((c) => (
-        <div key={c.id} className="rounded-xl border border-border bg-background p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <div className="flex-1 flex items-center gap-2">
-              <p className="font-medium">{c.username}</p>
-              <Badge variant={c.isAdmin ? "default" : "outline"} className={c.isAdmin ? "bg-primary text-primary-foreground gap-1" : ""}>
-                {c.isAdmin && <Shield className="h-3 w-3" />}
-                {c.isAdmin ? "Administrador" : "Cliente"}
-              </Badge>
-            </div>
-            <Button variant="ghost" size="icon" onClick={() => reset(c.id)} aria-label="Cambiar contraseña"><KeyRound /></Button>
-            <Button variant="ghost" size="icon" onClick={() => remove(c.id, c.username)} aria-label="Eliminar"><Trash2 /></Button>
+
+      {/* Barra de filtros y separación entre Trabajadores y Clientes */}
+      <div className="rounded-2xl border border-border bg-card p-3 sm:p-4 shadow-xs space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="font-bold text-base text-foreground flex items-center gap-2">
+              <Users className="h-4 w-4 text-primary" />
+              Gestión y Separación de Usuarios
+            </h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Decide quién es <strong>Trabajador</strong> (técnico propio) y quién es <strong>Cliente</strong> (empresa). Los trabajadores no se contabilizan como clientes.
+            </p>
           </div>
 
-          <label className="flex items-center justify-between rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-sm">
+          {/* Filtros rápidos: Todos, Trabajadores, Clientes */}
+          <div className="inline-flex rounded-xl border border-border bg-muted/60 p-1 shrink-0">
+            <button
+              type="button"
+              onClick={() => setFilterType("all")}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                filterType === "all"
+                  ? "bg-background text-foreground shadow-xs font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Todos ({allClientsList.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterType("worker")}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                filterType === "worker"
+                  ? "bg-primary text-primary-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <HardHat className="h-3.5 w-3.5" />
+              Trabajadores ({totalWorkers})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterType("client")}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                filterType === "client"
+                  ? "bg-emerald-600 text-white shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Building2 className="h-3.5 w-3.5" />
+              Clientes ({totalClients})
+            </button>
+          </div>
+        </div>
+
+        {/* Buscador de usuario */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar usuario por nombre…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 h-9 text-xs"
+          />
+        </div>
+      </div>
+
+      {clients.isLoading && (
+        <p className="text-sm text-muted-foreground text-center py-6">Cargando usuarios…</p>
+      )}
+
+      {!clients.isLoading && filteredList.length === 0 && (
+        <div className="rounded-xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
+          No se encontraron usuarios {filterType === "worker" ? "trabajadores" : filterType === "client" ? "clientes" : ""}{" "}
+          {searchQuery ? `para "${searchQuery}"` : ""}.
+        </div>
+      )}
+
+      {/* Listado de usuarios con separador y selector directo Trabajador / Cliente */}
+      {filteredList.map((c) => (
+        <div key={c.id} className="rounded-2xl border border-border bg-card p-4 sm:p-5 space-y-3.5 shadow-xs">
+          {/* Cabecera del usuario: Nombre, badges y acciones */}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl font-bold text-sm ${
+                  c.userType === "worker"
+                    ? "bg-primary/10 text-primary"
+                    : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                }`}
+              >
+                {c.userType === "worker" ? (
+                  <HardHat className="h-4 w-4" />
+                ) : (
+                  <Building2 className="h-4 w-4" />
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="font-bold text-sm text-foreground truncate">{c.username}</p>
+                <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                  {/* Badge de tipo: Trabajador vs Cliente */}
+                  {c.userType === "worker" ? (
+                    <Badge className="bg-primary/10 text-primary border-primary/25 text-[10px] font-bold px-2 py-0.5 gap-1">
+                      <HardHat className="h-3 w-3" /> Trabajador
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 text-[10px] font-bold px-2 py-0.5 gap-1">
+                      <Building2 className="h-3 w-3" /> Cliente
+                    </Badge>
+                  )}
+                  {c.isAdmin && (
+                    <Badge className="bg-primary text-primary-foreground text-[10px] font-bold px-2 py-0.5 gap-1">
+                      <Shield className="h-3 w-3" /> Administrador
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <Button variant="ghost" size="icon" onClick={() => reset(c.id)} aria-label="Cambiar contraseña" title="Cambiar contraseña" className="h-8 w-8 rounded-lg">
+                <KeyRound className="h-4 w-4 text-muted-foreground" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => remove(c.id, c.username)} aria-label="Eliminar" title="Eliminar usuario" className="h-8 w-8 rounded-lg text-destructive hover:bg-destructive/10">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Selector principal: ¿Es Trabajador o Cliente? */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 rounded-xl border border-border/80 bg-muted/30 p-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <UserCheck className="h-4 w-4 text-primary shrink-0" />
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-foreground block">
+                  Clasificación: {c.userType === "worker" ? "Trabajador / Personal Técnico" : "Empresa / Cliente"}
+                </span>
+                <span className="text-[11px] text-muted-foreground block">
+                  {c.userType === "worker"
+                    ? "Técnico propio. NO se contabiliza en el resumen de clientes."
+                    : "Empresa cliente. Se contabiliza y lista en partes por cliente."}
+                </span>
+              </div>
+            </div>
+
+            <div className="inline-flex rounded-xl border border-border bg-background p-1 shrink-0 self-end sm:self-auto">
+              <button
+                type="button"
+                onClick={() => changeUserType(c.id, c.username, "worker")}
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                  c.userType === "worker"
+                    ? "bg-primary text-primary-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <HardHat className="h-3.5 w-3.5" />
+                Trabajador
+              </button>
+              <button
+                type="button"
+                onClick={() => changeUserType(c.id, c.username, "client")}
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                  c.userType === "client"
+                    ? "bg-emerald-600 text-white shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Building2 className="h-3.5 w-3.5" />
+                Cliente
+              </button>
+            </div>
+          </div>
+
+          {/* Permiso de administrador */}
+          <label className="flex items-center justify-between rounded-xl border border-primary/25 bg-primary/5 px-3 py-2 text-sm">
             <div className="flex items-center gap-2 font-medium">
               <Shield className="h-4 w-4 text-primary" />
               <span>Acceso de Administrador (todas las opciones)</span>
@@ -643,81 +913,88 @@ function ClientsAdmin({ myId }: { myId: string }) {
           </label>
 
           {c.isAdmin ? (
-            <p className="rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            <p className="rounded-xl bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
               ✨ Este usuario es <strong>Administrador</strong>: tiene acceso automático y completo a todas las máquinas, todos los partes de trabajo, stock, avisos y gestión de la app.
             </p>
           ) : (
             <>
-              <label className="flex items-center justify-between rounded-lg bg-muted/60 px-3 py-2 text-sm">
-                <span className="flex items-center gap-2"><FileText className="h-4 w-4 text-primary" /> Partes de trabajo</span>
-                <Switch checked={c.can_work_reports} onCheckedChange={(v) => toggleReports(c.id, v)} />
-              </label>
-              <label className="flex items-center justify-between rounded-lg bg-muted/60 px-3 py-2 text-sm">
-                <div className="flex items-center gap-2">
-                  <Wrench className="h-4 w-4 text-primary" />
-                  <div>
-                    <span className="font-medium">Crear y asignar trabajos para otros</span>
-                    <span className="block text-xs text-muted-foreground">Permite al usuario crear trabajos y asignárselos a compañeros</span>
-                  </div>
-                </div>
-                <Switch checked={c.can_create_jobs} onCheckedChange={(v) => toggleCreateJobs(c.id, v)} />
-              </label>
-              <label className="flex items-center justify-between rounded-lg bg-muted/60 px-3 py-2 text-sm">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-amber-500" />
-                  <div>
-                    <span className="font-medium">Averías / Fallos</span>
-                    <span className="block text-xs text-muted-foreground">Permite al cliente dar avisos de avería con fotos y ver el estado</span>
-                  </div>
-                </div>
-                <Switch checked={c.can_averias} onCheckedChange={(v) => toggleAverias(c.id, v)} />
-              </label>
-              <label className="flex items-center justify-between rounded-lg bg-muted/60 px-3 py-2 text-sm">
-                <div className="flex items-center gap-2">
-                  <Bell className="h-4 w-4 text-primary" />
-                  <div>
-                    <span className="font-medium">Recibir avisos de averías de clientes</span>
-                    <span className="block text-xs text-muted-foreground">Ventana emergente y notificación push en el móvil (incluso con pantalla apagada)</span>
-                  </div>
-                </div>
-                <Switch checked={c.receives_averia_alerts} onCheckedChange={(v) => toggleAveriaAlerts(c.id, v)} />
-              </label>
-              {c.can_work_reports && (
-                <>
-                  <label className="flex items-center justify-between rounded-lg bg-muted/60 px-3 py-2 text-sm">
-                    <span>Puede pedir modificar un parte cerrado</span>
-                    <Switch checked={c.can_request_edit} onCheckedChange={async (v) => {
-                      const { error } = await supabase.from("profiles").update({ can_request_edit: v }).eq("id", c.id);
-                      if (error) { err(error); return; }
-                      qc.invalidateQueries({ queryKey: ["admin-clients"] });
-                    }} />
-                  </label>
-                  <label className="flex items-center justify-between rounded-lg bg-muted/60 px-3 py-2 text-sm">
-                    <div>
-                      <span className="block font-medium">Ver partes de otros trabajadores</span>
-                      <span className="block text-xs text-muted-foreground">Permite ver los partes de todos los clientes creados por otros compañeros</span>
-                    </div>
-                    <Switch checked={c.can_view_all_reports} onCheckedChange={async (v) => {
-                      const { error } = await supabase.from("profiles").update({ can_view_all_reports: v } as any).eq("id", c.id);
-                      if (error) {
-                        err(error);
-                        return;
-                      }
-                      toast.success(v ? "Permiso para ver todos los partes concedido" : "Permiso revocado");
-                      qc.invalidateQueries({ queryKey: ["admin-clients"] });
-                    }} />
-                  </label>
-                </>
-              )}
+              {/* Permisos según tipo de usuario */}
               <div className="space-y-2 pt-1">
-                <p className="text-xs font-medium text-muted-foreground">Máquinas asignadas:</p>
+                <label className="flex items-center justify-between rounded-xl bg-muted/60 px-3 py-2 text-sm">
+                  <span className="flex items-center gap-2"><FileText className="h-4 w-4 text-primary" /> Partes de trabajo</span>
+                  <Switch checked={c.can_work_reports} onCheckedChange={(v) => toggleReports(c.id, v)} />
+                </label>
+                <label className="flex items-center justify-between rounded-xl bg-muted/60 px-3 py-2 text-sm">
+                  <div className="flex items-center gap-2">
+                    <Wrench className="h-4 w-4 text-primary" />
+                    <div>
+                      <span className="font-medium">Crear y asignar trabajos para otros</span>
+                      <span className="block text-xs text-muted-foreground">Permite al usuario crear trabajos y asignárselos a compañeros</span>
+                    </div>
+                  </div>
+                  <Switch checked={c.can_create_jobs} onCheckedChange={(v) => toggleCreateJobs(c.id, v)} />
+                </label>
+                <label className="flex items-center justify-between rounded-xl bg-muted/60 px-3 py-2 text-sm">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                    <div>
+                      <span className="font-medium">Averías / Fallos</span>
+                      <span className="block text-xs text-muted-foreground">Permite dar avisos de avería con fotos y ver el estado</span>
+                    </div>
+                  </div>
+                  <Switch checked={c.can_averias} onCheckedChange={(v) => toggleAverias(c.id, v)} />
+                </label>
+                <label className="flex items-center justify-between rounded-xl bg-muted/60 px-3 py-2 text-sm">
+                  <div className="flex items-center gap-2">
+                    <Bell className="h-4 w-4 text-primary" />
+                    <div>
+                      <span className="font-medium">Recibir avisos de averías de clientes</span>
+                      <span className="block text-xs text-muted-foreground">Ventana emergente y notificación push en el móvil (incluso con pantalla apagada)</span>
+                    </div>
+                  </div>
+                  <Switch checked={c.receives_averia_alerts} onCheckedChange={(v) => toggleAveriaAlerts(c.id, v)} />
+                </label>
+                {c.can_work_reports && (
+                  <>
+                    <label className="flex items-center justify-between rounded-xl bg-muted/60 px-3 py-2 text-sm">
+                      <span>Puede pedir modificar un parte cerrado</span>
+                      <Switch checked={c.can_request_edit} onCheckedChange={async (v) => {
+                        const { error } = await supabase.from("profiles").update({ can_request_edit: v }).eq("id", c.id);
+                        if (error) { err(error); return; }
+                        qc.invalidateQueries({ queryKey: ["admin-clients"] });
+                      }} />
+                    </label>
+                    <label className="flex items-center justify-between rounded-xl bg-muted/60 px-3 py-2 text-sm">
+                      <div>
+                        <span className="block font-medium">Ver partes de otros trabajadores</span>
+                        <span className="block text-xs text-muted-foreground">Permite ver los partes de todos los clientes creados por otros compañeros</span>
+                      </div>
+                      <Switch checked={c.can_view_all_reports} onCheckedChange={async (v) => {
+                        const { error } = await supabase.from("profiles").update({ can_view_all_reports: v } as any).eq("id", c.id);
+                        if (error) {
+                          err(error);
+                          return;
+                        }
+                        toast.success(v ? "Permiso para ver todos los partes concedido" : "Permiso revocado");
+                        qc.invalidateQueries({ queryKey: ["admin-clients"] });
+                      }} />
+                    </label>
+                  </>
+                )}
+              </div>
+
+              {/* Máquinas asignadas */}
+              <div className="space-y-2 pt-1 border-t border-border/60">
+                <p className="text-xs font-semibold text-muted-foreground">Máquinas asignadas:</p>
                 {machines.data?.length === 0 && <p className="text-sm text-muted-foreground">Añade máquinas primero.</p>}
-                {machines.data?.map((m) => (
-                  <label key={m.id} className="flex items-center gap-3 text-sm">
-                    <Checkbox checked={c.machineIds.has(m.id)} onCheckedChange={(v) => toggle(c.id, m.id, v === true)} />
-                    {m.name}
-                  </label>
-                ))}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {machines.data?.map((m) => (
+                    <label key={m.id} className="flex items-center gap-2.5 text-xs rounded-lg border border-border/70 p-2 bg-background hover:bg-muted/40 cursor-pointer">
+                      <Checkbox checked={c.machineIds.has(m.id)} onCheckedChange={(v) => toggle(c.id, m.id, v === true)} />
+                      <span className="truncate font-medium">{m.name}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
             </>
           )}

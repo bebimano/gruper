@@ -292,19 +292,56 @@ export const getClientReportsSummaryAdminServer = createServerFn({ method: "POST
       .maybeSingle();
     if (!adminRole) throw new Error("No autorizado");
 
-    const [{ data: profiles }, { data: contacts }, { data: equipmentRows }, { data: reports }] =
-      await Promise.all([
-        supabaseAdmin.from("profiles").select("id, username").order("username"),
-        supabaseAdmin.from("report_contacts").select("name").order("name"),
-        supabaseAdmin.from("client_equipment").select("client_name"),
-        supabaseAdmin
-          .from("work_reports")
-          .select("id, number, user_number, created_at, closed, data")
-          .order("created_at", { ascending: false }),
-      ]);
+    const [
+      { data: profiles },
+      { data: contacts },
+      { data: equipmentRows },
+      { data: reports },
+      { data: userTypeRows },
+      { data: adminRoles },
+    ] = await Promise.all([
+      supabaseAdmin.from("profiles").select("id, username, can_work_reports").order("username"),
+      supabaseAdmin.from("report_contacts").select("name").order("name"),
+      supabaseAdmin.from("client_equipment").select("client_name"),
+      supabaseAdmin
+        .from("work_reports")
+        .select("id, number, user_number, created_at, closed, data")
+        .order("created_at", { ascending: false }),
+      supabaseAdmin
+        .from("client_equipment")
+        .select("client_name, num_serie")
+        .like("client_name", "__USER_TYPE__%"),
+      supabaseAdmin.from("user_roles").select("user_id").eq("role", "admin"),
+    ]);
 
-    const registeredUsernames = new Set(
+    const adminUserIds = new Set((adminRoles ?? []).map((a) => a.user_id));
+    const userTypeMap = new Map<string, "worker" | "client">();
+    for (const r of userTypeRows ?? []) {
+      const uid = (r.client_name as string).replace("__USER_TYPE__", "");
+      const val = String((r as any).num_serie || "").trim().toLowerCase();
+      if (val === "worker" || val === "client") {
+        userTypeMap.set(uid, val);
+      }
+    }
+
+    // Identificar qué perfiles son trabajadores (no deben contarse ni listarse como clientes)
+    const workerUserIds = new Set<string>();
+    const workerUsernames = new Set<string>();
+    for (const p of profiles ?? []) {
+      const explicit = userTypeMap.get(p.id);
+      const isAdmin = adminUserIds.has(p.id);
+      const isWorker =
+        explicit === "worker" || (!explicit && (isAdmin || !!(p as any).can_work_reports));
+      if (isWorker) {
+        workerUserIds.add(p.id);
+        if (p.username) workerUsernames.add(p.username.trim().toLowerCase());
+      }
+    }
+
+    // Nombres de usuario registrados que son estrictamente CLIENTES
+    const registeredClientUsernames = new Set(
       (profiles ?? [])
+        .filter((p) => !workerUserIds.has(p.id))
         .map((p) => (p.username || "").trim().toLowerCase())
         .filter(Boolean)
     );
@@ -318,8 +355,9 @@ export const getClientReportsSummaryAdminServer = createServerFn({ method: "POST
       }
     >();
 
-    // 1. Clientes registrados
+    // 1. Clientes registrados (SOLO los que son clientes, NUNCA trabajadores)
     for (const p of profiles ?? []) {
+      if (workerUserIds.has(p.id)) continue;
       const name = (p.username || "").trim();
       if (!name) continue;
       const key = name.toLowerCase();
@@ -340,7 +378,7 @@ export const getClientReportsSummaryAdminServer = createServerFn({ method: "POST
       if (!clientMap.has(key)) {
         clientMap.set(key, {
           displayName: name,
-          isRegisteredUser: registeredUsernames.has(key),
+          isRegisteredUser: registeredClientUsernames.has(key),
           partes: [],
         });
       }
@@ -354,7 +392,7 @@ export const getClientReportsSummaryAdminServer = createServerFn({ method: "POST
       if (!clientMap.has(key)) {
         clientMap.set(key, {
           displayName: name,
-          isRegisteredUser: registeredUsernames.has(key),
+          isRegisteredUser: registeredClientUsernames.has(key),
           partes: [],
         });
       }
