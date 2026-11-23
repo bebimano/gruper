@@ -235,25 +235,26 @@ export async function generatePdfDoc(
   doc.rect(M, y, contentW, tableHeaderH, "S");
 
   doc.setFont("helvetica", "bold").setFontSize(7.5).setTextColor(PRIMARY_RGB[0], PRIMARY_RGB[1], PRIMARY_RGB[2]);
-  const colX = [
-    M + 3,        // Día / Fecha
-    M + 30,       // Salida Ida
-    M + 52,       // Km Ida
-    M + 68,       // Trabajo Mañana
-    M + 98,       // Trabajo Tarde
-    M + 128,      // Salida Vuelta
-    M + 152,      // Km Vuelta
-    M + 168,      // Total Jornada
-  ];
 
-  doc.text("DÍA / FECHA", colX[0]!, y + 4.2);
-  doc.text("SALIDA (IDA)", colX[1]!, y + 4.2);
-  doc.text("KM IDA", colX[2]!, y + 4.2);
-  doc.text("MAÑANA", colX[3]!, y + 4.2);
-  doc.text("TARDE", colX[4]!, y + 4.2);
-  doc.text("VUELTA", colX[5]!, y + 4.2);
-  doc.text("KM VTA", colX[6]!, y + 4.2);
-  doc.text("MANO OBRA", colX[7]!, y + 4.2);
+  // Centros calculados para las 7 columnas dentro de contentW (182mm)
+  // [32mm Día, 26mm Salida Ida, 18mm Km Ida, 34mm Trabajo, 26mm Vuelta, 18mm Km Vta, 28mm Mano Obra]
+  const cX = {
+    dia: M + 3,
+    ida: 59,
+    kmIda: 81,
+    trabajo: 107,
+    vuelta: 137,
+    kmVuelta: 159,
+    manoObra: 182,
+  };
+
+  doc.text("DÍA / FECHA", cX.dia, y + 4.2);
+  doc.text("SALIDA (IDA)", cX.ida, y + 4.2, { align: "center" });
+  doc.text("KM IDA", cX.kmIda, y + 4.2, { align: "center" });
+  doc.text("TRABAJO", cX.trabajo, y + 4.2, { align: "center" });
+  doc.text("VUELTA", cX.vuelta, y + 4.2, { align: "center" });
+  doc.text("KM VTA", cX.kmVuelta, y + 4.2, { align: "center" });
+  doc.text("MANO OBRA", cX.manoObra, y + 4.2, { align: "center" });
 
   y += tableHeaderH;
 
@@ -273,27 +274,15 @@ export async function generatePdfDoc(
     doc.setLineWidth(0.15);
     doc.line(M, y + 6.5, M + contentW, y + 6.5);
 
-    let mananaStr = rg(d.mananaDe, d.mananaA);
-    let tardeStr = rg(d.tardeDe, d.tardeA);
-
-    // Cálculo automático si sólo se usó llegada y salida
-    const workIntervalMin = durationMinutes(d.mananaDe, d.mananaA) + durationMinutes(d.tardeDe, d.tardeA);
-    if ((mananaStr === "—" && tardeStr === "—") || (workIntervalMin === 0 && d.idaA && d.vueltaDe)) {
-      const sMin = timeToMinutes(d.idaA);
-      const eMin = timeToMinutes(d.vueltaDe);
-      if (sMin !== null && eMin !== null) {
-        const splitMin = 14 * 60;
-        if (sMin < splitMin && eMin > splitMin) {
-          mananaStr = `${d.idaA}-14:00`;
-          tardeStr = `14:00-${d.vueltaDe}`;
-        } else if (sMin >= splitMin) {
-          mananaStr = "—";
-          tardeStr = `${d.idaA}-${d.vueltaDe}`;
-        } else {
-          mananaStr = `${d.idaA}-${d.vueltaDe}`;
-          tardeStr = "—";
-        }
-      }
+    // Intervalo de trabajo en el cliente
+    let trabajoStr = "—";
+    if (d.idaA && d.vueltaDe) {
+      trabajoStr = `${d.idaA}-${d.vueltaDe}`;
+    } else {
+      const parts: string[] = [];
+      if (d.mananaDe || d.mananaA) parts.push(`${d.mananaDe || "—"}-${d.mananaA || "—"}`);
+      if (d.tardeDe || d.tardeA) parts.push(`${d.tardeDe || "—"}-${d.tardeA || "—"}`);
+      if (parts.length > 0) trabajoStr = parts.join(" / ");
     }
 
     const dayWorkMin = (d.idaA && d.vueltaDe)
@@ -305,17 +294,16 @@ export async function generatePdfDoc(
 
     doc.setFont("helvetica", "normal").setFontSize(7.5).setTextColor(TEXT_RGB[0], TEXT_RGB[1], TEXT_RGB[2]);
 
-    doc.text(dayLabel, colX[0]!, y + 4.5);
-    doc.text(rg(d.idaDe, d.idaA), colX[1]!, y + 4.5);
-    doc.text(d.kmIda ? `${d.kmIda} km` : "—", colX[2]!, y + 4.5);
-    doc.text(mananaStr, colX[3]!, y + 4.5);
-    doc.text(tardeStr, colX[4]!, y + 4.5);
-    doc.text(rg(d.vueltaDe, d.vueltaA), colX[5]!, y + 4.5);
-    doc.text(d.kmVuelta ? `${d.kmVuelta} km` : "—", colX[6]!, y + 4.5);
+    doc.text(dayLabel, cX.dia, y + 4.5);
+    doc.text(rg(d.idaDe, d.idaA), cX.ida, y + 4.5, { align: "center" });
+    doc.text(d.kmIda ? `${d.kmIda} km` : "—", cX.kmIda, y + 4.5, { align: "center" });
+    doc.text(trabajoStr, cX.trabajo, y + 4.5, { align: "center" });
+    doc.text(rg(d.vueltaDe, d.vueltaA), cX.vuelta, y + 4.5, { align: "center" });
+    doc.text(d.kmVuelta ? `${d.kmVuelta} km` : "—", cX.kmVuelta, y + 4.5, { align: "center" });
 
-    // Total de mano de obra del día en negrita
+    // Total de mano de obra del día centrado en negrita
     doc.setFont("helvetica", "bold").setTextColor(PRIMARY_RGB[0], PRIMARY_RGB[1], PRIMARY_RGB[2]);
-    doc.text(formatMinutes(dayWorkMin), colX[7]!, y + 4.5);
+    doc.text(formatMinutes(dayWorkMin), cX.manoObra, y + 4.5, { align: "center" });
 
     y += 6.5;
   });
@@ -534,18 +522,21 @@ export async function generatePdfDoc(
   doc.roundedRect(M, y, sigBoxW, sigBoxH, 2, 2, "S");
 
   doc.setFont("helvetica", "bold").setFontSize(7.5).setTextColor(MUTED_RGB[0], MUTED_RGB[1], MUTED_RGB[2]);
-  doc.text("FIRMA DEL CLIENTE", M + 3, y + 4);
+  doc.text("FIRMA DEL CLIENTE", M + sigBoxW / 2, y + 4.5, { align: "center" });
 
   if (r.firma) {
     try {
-      doc.addImage(r.firma, "PNG", M + 4, y + 6, sigBoxW - 8, 20);
+      const sigW = Math.min(sigBoxW - 12, 60);
+      const sigH = 14;
+      const sigX = M + (sigBoxW - sigW) / 2;
+      doc.addImage(r.firma, "PNG", sigX, y + 6.5, sigW, sigH);
     } catch (e) {
       console.error("Error adding signature", e);
     }
   }
 
   doc.setFont("helvetica", "normal").setFontSize(7.5).setTextColor(DARK_RGB[0], DARK_RGB[1], DARK_RGB[2]);
-  doc.text(`Firmado por: ${r.firmaNombre || r.cliente || "Cliente"}`, M + 3, y + sigBoxH - 2.5);
+  doc.text(`Firmado por: ${r.firmaNombre || r.cliente || "Cliente"}`, M + sigBoxW / 2, y + sigBoxH - 3, { align: "center" });
 
   // Cuadro 2: Servicio Técnico Responsable
   const box2X = M + sigBoxW + 6;
@@ -556,15 +547,19 @@ export async function generatePdfDoc(
   doc.roundedRect(box2X, y, sigBoxW, sigBoxH, 2, 2, "S");
 
   doc.setFont("helvetica", "bold").setFontSize(7.5).setTextColor(MUTED_RGB[0], MUTED_RGB[1], MUTED_RGB[2]);
-  doc.text("SERVICIO TÉCNICO OFICIAL", box2X + 3, y + 4);
+  doc.text("SERVICIO TÉCNICO OFICIAL", box2X + sigBoxW / 2, y + 4.5, { align: "center" });
 
-  doc.setFont("helvetica", "bold").setFontSize(9).setTextColor(PRIMARY_RGB[0], PRIMARY_RGB[1], PRIMARY_RGB[2]);
-  doc.text("GRUPER REMOTE", box2X + 3, y + 13);
+  // Logo de Gruper centrado y elegante
+  if (img) {
+    const logoW = 34;
+    const logoH = 10.5;
+    const logoX = box2X + (sigBoxW - logoW) / 2;
+    doc.addImage(img, "PNG", logoX, y + 6.5, logoW, logoH);
+  }
 
-  doc.setFont("helvetica", "normal").setFontSize(7.5).setTextColor(TEXT_RGB[0], TEXT_RGB[1], TEXT_RGB[2]);
-  doc.text(`Técnico: ${r.tecnico || creatorName || "SAT"}`, box2X + 3, y + 19);
-  doc.text(`Vehículo: ${r.vehiculo || "—"}`, box2X + 3, y + 24);
-  doc.text(`Estado: Conforme y cerrado`, box2X + 3, y + sigBoxH - 2.5);
+  doc.setFont("helvetica", "normal").setFontSize(7.5).setTextColor(DARK_RGB[0], DARK_RGB[1], DARK_RGB[2]);
+  doc.text(`Técnico: ${r.tecnico || creatorName || "SAT Gruper"}`, box2X + sigBoxW / 2, y + 21, { align: "center" });
+  doc.text(`Vehículo: ${r.vehiculo || "—"}   ·   Conforme y cerrado`, box2X + sigBoxW / 2, y + 26.5, { align: "center" });
 
   y += sigBoxH + 4;
 

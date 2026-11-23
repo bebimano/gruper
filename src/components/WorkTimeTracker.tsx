@@ -452,7 +452,7 @@ export function WorkTimeTracker({ dias = [], onChange, disabled = false }: WorkT
           </button>
         </div>
 
-        {/* AJUSTE MANUAL OPCIONAL DE HORAS MAÑANA / TARDE */}
+        {/* AJUSTE MANUAL OPCIONAL DE HORAS */}
         <div className="border-t border-border/60 pt-2.5">
           <button
             type="button"
@@ -460,7 +460,7 @@ export function WorkTimeTracker({ dias = [], onChange, disabled = false }: WorkT
             className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-primary transition-colors cursor-pointer"
           >
             <Sliders className="h-3.5 w-3.5" />
-            <span>{showManualHours ? "Ocultar desglose manual de horas" : "Ver / ajustar tramos de mañana y tarde manualmente"}</span>
+            <span>{showManualHours ? "Ocultar ajuste manual de horas" : "Ajuste manual de horas de trabajo"}</span>
           </button>
 
           {showManualHours && (
