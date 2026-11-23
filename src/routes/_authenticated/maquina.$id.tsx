@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { SettingsDropdown } from "@/components/SettingsDropdown";
 
 export const Route = createFileRoute("/_authenticated/maquina/$id")({
   head: () => ({
@@ -123,14 +124,17 @@ function Viewer() {
         <span className="flex-1 truncate text-center text-sm sm:text-base font-bold text-foreground">
           {q.data?.name ?? ""}
         </span>
-        <button
-          onClick={openOutside}
-          aria-label="Abrir a pantalla completa"
-          title="Abrir a pantalla completa"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border/80 bg-background text-foreground/80 shadow-2xs transition-all hover:bg-muted hover:border-primary/50 hover:text-primary active:scale-95"
-        >
-          <ExternalLink className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-1.5">
+          <SettingsDropdown />
+          <button
+            onClick={openOutside}
+            aria-label="Abrir a pantalla completa"
+            title="Abrir a pantalla completa"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border/80 bg-background text-foreground/80 shadow-2xs transition-all hover:bg-muted hover:border-primary/50 hover:text-primary active:scale-95"
+          >
+            <ExternalLink className="h-4 w-4" />
+          </button>
+        </div>
       </header>
 
       {q.isLoading ? (

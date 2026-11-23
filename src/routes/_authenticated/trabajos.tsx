@@ -35,6 +35,7 @@ import {
 } from "@/lib/jobs.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SettingsDropdown } from "@/components/SettingsDropdown";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 
@@ -308,22 +309,26 @@ function Trabajos() {
       <header className="py-3 flex items-center justify-between">
         <Link
           to="/maquinas"
-          className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-card px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-foreground/90 shadow-2xs transition-all hover:bg-muted hover:border-primary/50 hover:text-primary active:scale-95"
+          className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-card px-3 sm:px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-foreground/90 shadow-2xs transition-all hover:bg-muted hover:border-primary/50 hover:text-primary active:scale-95"
         >
           <ArrowLeft className="h-4 w-4 text-primary" />
-          <span>Volver a máquinas</span>
+          <span className="hidden sm:inline">Volver a máquinas</span>
+          <span className="sm:hidden">Máquinas</span>
         </Link>
 
-        {canCreate && (
-          <Button
-            onClick={() => setShowCreateModal((v) => !v)}
-            size="sm"
-            className="rounded-xl shadow-xs font-semibold active:scale-95 transition-all gap-1.5"
-          >
-            <Plus className="h-4 w-4" />
-            <span>{showCreateModal ? "Ocultar formulario" : "Crear trabajo"}</span>
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <SettingsDropdown />
+          {canCreate && (
+            <Button
+              onClick={() => setShowCreateModal((v) => !v)}
+              size="sm"
+              className="rounded-xl shadow-xs font-semibold active:scale-95 transition-all gap-1.5"
+            >
+              <Plus className="h-4 w-4" />
+              <span>{showCreateModal ? "Ocultar formulario" : "Crear trabajo"}</span>
+            </Button>
+          )}
+        </div>
       </header>
 
       {/* Banner de Averías pendientes de clientes */}

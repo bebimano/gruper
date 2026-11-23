@@ -16,6 +16,7 @@ import { AboutLink } from "@/components/AboutLink";
 import { ContactLink } from "@/components/ContactLink";
 import { IndustrialHmiIcon } from "@/components/IndustrialHmiIcon";
 import { GreetingWeatherCard } from "@/components/GreetingWeatherCard";
+import { SettingsDropdown } from "@/components/SettingsDropdown";
 import logo from "@/assets/gruper-logo.png.asset.json";
 
 export const Route = createFileRoute("/_authenticated/maquinas")({
@@ -63,24 +64,12 @@ function Machines() {
       <header className="flex items-center justify-between py-3">
         <img src={logo.url} alt="Gruper" width={1076} height={343} className="h-9 sm:h-11 w-auto" />
         <div className="flex items-center gap-2 sm:gap-2.5">
-          {me.data?.isAdmin && (
-            <Button
-              variant="outline"
-              asChild
-              aria-label="Administración y ajustes"
-              className="rounded-xl border border-border/80 bg-card h-10 sm:h-11 px-3 sm:px-4 text-xs sm:text-sm font-semibold shadow-2xs hover:border-primary/50 hover:bg-muted hover:text-primary active:scale-95 transition-all cursor-pointer gap-2"
-            >
-              <Link to="/admin">
-                <Settings className="h-4 w-4 sm:h-4.5 sm:w-4.5 text-primary" />
-                <span>Ajustes</span>
-              </Link>
-            </Button>
-          )}
+          <SettingsDropdown />
           <Button
             variant="outline"
             onClick={logout}
             aria-label="Cerrar sesión"
-            className="rounded-xl border border-border/80 bg-card h-10 sm:h-11 px-3 sm:px-4 text-xs sm:text-sm font-semibold shadow-2xs hover:border-destructive/40 hover:text-destructive hover:bg-destructive/10 active:scale-95 transition-all text-muted-foreground cursor-pointer gap-2"
+            className="rounded-xl border border-border/80 bg-card h-9 sm:h-10 px-3 sm:px-4 text-xs sm:text-sm font-semibold shadow-2xs hover:border-destructive/40 hover:text-destructive hover:bg-destructive/10 active:scale-95 transition-all text-muted-foreground cursor-pointer gap-2"
           >
             <LogOut className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
             <span>Salir</span>

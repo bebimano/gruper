@@ -21,6 +21,7 @@ import { normalizeReport } from "@/lib/work-report";
 import { useWorkerInitials, formatReportNumber } from "@/lib/worker-initials";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SettingsDropdown } from "@/components/SettingsDropdown";
 
 export const Route = createFileRoute("/_authenticated/partes")({
   head: () => ({
@@ -309,16 +310,20 @@ function Partes() {
       <header className="flex items-center justify-between py-3">
         <Link
           to="/maquinas"
-          className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-card px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-foreground/90 shadow-2xs transition-all hover:bg-muted hover:border-primary/50 hover:text-primary active:scale-95"
+          className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-card px-3 sm:px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-foreground/90 shadow-2xs transition-all hover:bg-muted hover:border-primary/50 hover:text-primary active:scale-95"
         >
           <ArrowLeft className="h-4 w-4 text-primary" />
-          <span>Volver a máquinas</span>
+          <span className="hidden sm:inline">Volver a máquinas</span>
+          <span className="sm:hidden">Máquinas</span>
         </Link>
-        <Button asChild size="sm" className="rounded-xl shadow-xs font-semibold active:scale-95 transition-all">
-          <Link to="/parte/$id" params={{ id: "nuevo" }}>
-            <Plus className="h-4 w-4 mr-1" /> Nuevo parte
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <SettingsDropdown />
+          <Button asChild size="sm" className="rounded-xl shadow-xs font-semibold active:scale-95 transition-all">
+            <Link to="/parte/$id" params={{ id: "nuevo" }}>
+              <Plus className="h-4 w-4 mr-1" /> Nuevo parte
+            </Link>
+          </Button>
+        </div>
       </header>
 
       <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">

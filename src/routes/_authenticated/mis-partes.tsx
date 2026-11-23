@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { SettingsDropdown } from "@/components/SettingsDropdown";
 import { useMe } from "@/lib/useRole";
 import {
   getMyClientReportsServer,
@@ -127,24 +128,28 @@ function MisPartesView() {
         <Button
           variant="outline"
           asChild
-          className="rounded-xl border border-border/80 bg-card h-10 sm:h-11 px-3 sm:px-4 text-xs sm:text-sm font-semibold shadow-2xs hover:border-primary/50 hover:bg-muted hover:text-primary active:scale-95 transition-all cursor-pointer gap-2"
+          className="rounded-xl border border-border/80 bg-card h-9 sm:h-10 px-3 sm:px-4 text-xs sm:text-sm font-semibold shadow-2xs hover:border-primary/50 hover:bg-muted hover:text-primary active:scale-95 transition-all cursor-pointer gap-2"
         >
           <Link to="/maquinas">
             <ArrowLeft className="h-4 w-4 text-primary" />
-            <span>Volver a máquinas</span>
+            <span className="hidden sm:inline">Volver a máquinas</span>
+            <span className="sm:hidden">Máquinas</span>
           </Link>
         </Button>
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => qc.invalidateQueries({ queryKey: ["my-client-reports"] })}
-          disabled={query.isFetching}
-          className="rounded-xl h-10 text-xs font-semibold gap-1.5"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 text-primary ${query.isFetching ? "animate-spin" : ""}`} />
-          <span className="hidden sm:inline">Actualizar</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <SettingsDropdown />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => qc.invalidateQueries({ queryKey: ["my-client-reports"] })}
+            disabled={query.isFetching}
+            className="rounded-xl h-9 sm:h-10 text-xs font-semibold gap-1.5"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 text-primary ${query.isFetching ? "animate-spin" : ""}`} />
+            <span className="hidden sm:inline">Actualizar</span>
+          </Button>
+        </div>
       </header>
 
       {/* Tarjeta principal de bienvenida e información de la empresa */}
